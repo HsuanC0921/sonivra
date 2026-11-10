@@ -2,7 +2,7 @@
 
 # Sonivra
 
-Local real-time speech recognition and translated subtitles (Japanese → Traditional Chinese)
+Live transcription and translated subtitles for Windows, powered by local models
 
 <p>
 <img src="https://img.shields.io/badge/Rust-2024-000000?style=flat-square&logo=rust&logoColor=white" alt="Rust 2024">
@@ -19,119 +19,122 @@ Local real-time speech recognition and translated subtitles (Japanese → Tradit
 
 </div>
 
-## Overview
+## What it does
 
-Sonivra is a subtitle application for Windows 11. It captures the audio the system is playing, recognizes Japanese speech as text, translates it into Traditional Chinese, and displays the result in an always-on-top subtitle window. Recognition and translation both run locally. Audio and text are not sent anywhere.
+Sonivra turns the audio playing on your PC into live subtitles. Keep the floating subtitle window over a video, a livestream or another app, and read the transcript, the translation or both.
 
-The application is a single native executable written in Rust with [Slint](https://slint.dev/). It does not use Electron or a WebView, and it does not require a resident Python or Node process.
+You can choose the spoken language and the translation language separately. Japanese to Traditional Chinese (Taiwan) is the default and the pair tested most closely so far. Other language pairs are available, with support depending on the models you choose.
 
-## Requirements
+Recognition and translation run on your PC by default. In this mode, your audio and transcripts stay local. If you configure an external translation endpoint, text is sent to that endpoint instead.
+
+The app is built with Rust and [Slint](https://slint.dev/). It needs no Python or Node.js installation, Electron or WebView.
+
+## Download and setup
+
+1. Download the Windows ZIP from [Releases](https://github.com/HsuanC0921/sonivra/releases/latest) and extract it.
+2. Run `Sonivra.exe`.
+3. Follow the setup page to download the inference runtimes and models. These are separate downloads with pinned versions and SHA-256 verification.
+4. Choose your audio source, spoken language and translation language, then start listening.
+
+The ZIP includes a file named `portable`. While that file is beside the executable, Sonivra keeps its settings, models and transcripts there too. Without it, Sonivra uses `%LOCALAPPDATA%\Sonivra`.
+
+### System requirements
 
 - Windows 11 x64
-- An NVIDIA GPU is recommended. Translation uses the CUDA build of llama.cpp and recognition uses the Vulkan build of speech.cpp
-- The default model pair (Qwen3-ASR 1.7B Q4_K and PLaMo 3 Translate 2B Q4_K_M) takes about 2.9 GB, and the runtimes are downloaded separately
+- An NVIDIA GPU is recommended for the default setup, which uses CUDA for translation and Vulkan for speech recognition
+- About 2.9 GB of disk space for the default model pair, plus space for the runtimes
 
-## Installation
+The defaults are Qwen3-ASR 1.7B Q4_K and PLaMo 3 Translate 2B Q4_K_M. Download size is not a measure of RAM or VRAM use. Measurements from one test machine are listed below.
 
-1. Extract `Sonivra-<version>-windows-x64.zip` to any folder.
-2. Run `Sonivra.exe`.
-3. On the "Get started" page, download the runtimes and models as prompted. Downloads use pinned versions and are verified with SHA-256.
-4. Select "Start".
+## Subtitles and controls
 
-The `portable` file in the folder keeps settings, models and transcripts in the same folder. Without it, data is stored in `%LOCALAPPDATA%\Sonivra`.
+<img src="docs/settings.png" alt="Subtitle appearance settings with a live preview" width="720">
 
-## Features
+The subtitle window stays on top of other windows. Drag its title bar to move it, or an edge or corner to resize it. You can change the font, text size, colors, background opacity and text effects. Older lines fade as new ones arrive, with up to 300 lines retained for display.
 
-| Area | Description |
+Scroll to read earlier subtitles. After 20 seconds without input, the window returns to the live view. Hold Ctrl while scrolling to change the text size, or Shift to change the background opacity.
+
+Right-click to open settings. The title bar can stay visible, appear on hover or stay hidden. Lock the window to enable click-through, so mouse clicks reach the app beneath it.
+
+| Shortcut | Action |
 |---|---|
-| Recognition and translation | Run locally. Median time from end of speech to finished translation is 606 ms (RTX 5070) |
-| Provisional text | During speech, the audio received so far is recognized every 0.8 s and shown dimmed until the complete sentence replaces it |
-| Subtitle window | Always on top, can be transparent and can pass mouse clicks through. Window height sets the number of lines shown, up to 300, with older lines fading |
-| Appearance | Size, font, color, background opacity and text effect can be changed in the subtitle window |
-| Audio source | Default output device, a single program, the microphone, or system sound mixed with the microphone |
-| Transcript | Search and review. Export as TXT, SRT or WebVTT. Optional automatic saving and recording of the recognized audio |
-| Streaming output | The current subtitle is written to `transcripts\live.txt` for an OBS text source |
-| Look profiles | Save and load appearance, context note, glossary and recognition hints |
-| Interface language | 繁體中文, English, 日本語 |
-
-## Usage
-
-<img src="docs/settings.png" alt="The Look page of the settings window with the preview pinned at the top" width="720">
-
-- Drag the title bar to move the window. Drag any edge or corner to resize it.
-- Scroll to review earlier lines. The window returns to live subtitles after 20 seconds without input. Ctrl+scroll changes the text size and Shift+scroll changes the background opacity.
-- The title bar can be set to stay visible, appear on hover, or be hidden. Right-click opens settings.
-- Mouse click-through can be enabled once the window is locked.
-
-| Hotkey | Action |
-|---|---|
-| `Ctrl+Alt+L` | Lock or unlock |
-| `Ctrl+Alt+P` | Start, pause, resume |
-| `Ctrl+Alt+H` | Show or hide the subtitle window |
-| `Ctrl+Alt+↑` / `↓` | Review earlier or later lines |
+| `Ctrl+Alt+L` | Lock or unlock the window |
+| `Ctrl+Alt+P` | Start, pause or resume |
+| `Ctrl+Alt+H` | Show or hide subtitles |
+| `Ctrl+Alt+↑` / `↓` | Scroll through earlier or later subtitles |
 | `Ctrl+Alt+=` / `-` | Increase or decrease text size |
-| `Ctrl+Alt+S` | Save the current transcript immediately |
+| `Ctrl+Alt+S` | Save the current transcript |
 
-## Transcript, recording and streaming output
+## Audio and languages
 
-- Starting again after a pause or stop continues the same transcript.
-- The save button on the title bar, or `Ctrl+Alt+S`, writes the current transcript as TXT to the `transcripts` folder.
-- With "Write live subtitle to a text file" enabled, the on-screen subtitle is mirrored to `transcripts\live.txt`.
-- With "Record the recognized sound" enabled, the audio sent to recognition (silence included) is saved as a 16 kHz mono WAV, one file per start, at about 115 MB per hour. The recording and the transcript share the same starting point.
-- "Earlier lines show" selects translation only, original only, or both.
+Capture all system audio, a single app or your microphone. You can also mix the microphone with system audio. Use headphones when mixing to avoid picking up the speaker output twice.
 
-## Languages
+Select a spoken language or let the recognition model detect it. Automatic detection also sets the source language for translation. The translation language list has 53 entries, but each recognition and translation model has its own language coverage. A language appearing in a menu does not mean every model supports it or that every language pair has been tested.
 
-The spoken language can be specified or set to automatic detection. With automatic detection, the translation source language is also determined automatically. The tested pair is Japanese to Traditional Chinese, and the translation target list contains 53 languages.
+The default context note is written for Japanese-to-Traditional-Chinese subtitles. Edit it to suit your target language when changing language pairs.
 
-## Experimental features
+For transcription without translation, turn translation off. The interface is available in Traditional Chinese, English and Japanese.
 
-These are disabled by default and can be enabled in settings.
+Translations can use recent source/translation pairs, a context note and a glossary. Profiles save these settings and recognition hints alongside the subtitle appearance.
 
-- **Translate provisional text**: while the translator is idle, the provisional original is translated and shown dimmed. It is skipped while latency is high or speech is queued.
-- **Re-translate the previous sentence**: once the next sentence is translated and the translator is idle, the previous sentence is translated again using the next one as context. The screen and transcript are updated if the translation changed.
+## Transcripts, recording and OBS
 
-## Limits
+Pausing or stopping does not clear the current transcript. When you resume, new lines are appended to it. Search the transcript in the app, or export it as TXT, SRT or WebVTT. The title-bar save button and `Ctrl+Alt+S` save a TXT file in `transcripts`.
 
-- Sentence segmentation uses RMS level detection, not a speech model. Background music is treated as speech, and a very quiet source can fall below the threshold. The sensitivity can be raised on the Audio page.
-- Provisional text can differ from the final result. Only final results are translated and recorded.
-- Recognition and translation each use one worker, with queue lengths of 2 and 1. When processing falls behind, the older segment is dropped.
-- Re-translation updates only the screen and exports. The automatically saved file is unchanged.
-- With the microphone enabled, the microphone picks up speaker output again. Headphones are recommended.
-- Not provided: speaker labels, re-recognition of recent audio, a second subtitle window, an installer, automatic updates.
+Two optional outputs are available in settings:
 
-## Measurements
+- **Live subtitle file:** writes the current on-screen subtitle to `transcripts\live.txt`, which OBS can read as a text source.
+- **Audio recording:** saves the audio sent to recognition, including silence, as a 16 kHz mono WAV. Each start creates a new recording, at roughly 115 MB per hour. Recording and transcript timestamps share the same starting point.
 
-Conditions: release build, default model pair, a 75-second continuous Japanese reading (LibriVox, "Akai rōsoku to ningyo", public domain) captured through WASAPI loopback. Test machine: NVIDIA GeForce RTX 5070 (12 GB), 32 GB RAM, Windows 11.
+Automatic transcript saving is optional. You can also choose whether earlier subtitles show the original text, the translation or both.
 
-| Item | Value |
+## Partial results and experimental options
+
+During speech, Sonivra transcribes the audio received so far every 0.8 seconds. These partial results appear dimmed and are replaced when the segment is finalized. They can change as more audio arrives. Only finalized results are added to the transcript, and by default only those results are translated.
+
+Two optional features are off by default:
+
+- **Translate partial results:** translates unfinished speech when the translator is idle. Sonivra skips this work when latency is high or audio is waiting to be processed.
+- **Revise the previous translation:** uses the next sentence as context to translate the previous one again. Changes appear on screen and in subsequent exports, but do not rewrite files already saved automatically.
+
+## Known limitations
+
+- Speech segmentation uses an RMS volume threshold. Music can keep a segment open, and very quiet speech can fall below the threshold. Adjust sensitivity on the audio settings page.
+- Recognition and translation each use one worker, with queues limited to two segments and one segment respectively. Older segments are dropped if processing falls behind.
+- Speaker labels, re-transcribing recent audio, a second subtitle window, an installer and automatic updates are not available.
+
+## Recorded performance
+
+These figures are from an existing release-build test, not a guarantee for other audio, models or hardware. The test captured 75 seconds of Japanese narration from the public-domain LibriVox recording of *Akai rōsoku to ningyo* through WASAPI loopback, using the default model pair on Windows 11 with an RTX 5070 (12 GB) and 32 GB RAM.
+
+| Measurement | Result |
 |---|---|
-| Segments translated | 21, none dropped |
-| End of speech to finished translation (median / 95th percentile) | 606 ms / 628 ms |
-| Endpoint wait (last segment) | 420 ms |
-| Recognition time (last segment) | 47 ms |
-| Translation time to first token (last segment) | 35 ms |
-| Main process memory | 65 MiB |
-| Recognition worker memory | 258 MiB |
-| Translation worker memory | 2,469 MiB |
-| Whole-GPU usage (NVML) | 6,674 MiB while running, about 2,700 MiB without Sonivra |
+| Segments translated | 21, with none dropped |
+| End of speech to completed translation, median / P95 | 606 ms / 628 ms |
+| Endpoint wait, last segment | 420 ms |
+| Recognition, last segment | 47 ms |
+| Translation time to first token, last segment | 35 ms |
+| Main process RAM | 65 MiB |
+| Recognition worker RAM | 258 MiB |
+| Translation worker RAM | 2,469 MiB |
+| Total GPU memory in use, reported by NVML | 6,674 MiB while running, about 2,700 MiB before Sonivra started |
 
-Memory is the working set (RSS). GPU usage is the value for the whole card and includes other programs.
+RAM figures are process working sets (RSS). The GPU figures include other applications and are not Sonivra-only allocations.
 
-## Building from source
+## Build from source
 
-Requires Rust (edition 2024) and the Windows SDK.
+Install stable Rust and the Visual Studio C++ build tools with the Windows SDK, then run:
 
-```bash
+```powershell
 cargo build --release
 ```
 
-The executable is `target/release/Sonivra.exe`. `cargo test` runs the unit tests. `tests/real_models.rs` requires real models and runtimes and is skipped by default.
+The executable is written to `target/release/Sonivra.exe`. Run `cargo test` for unit tests. The integration tests in `tests/real_models.rs` need actual models and runtimes and are ignored by default.
 
-## License
+## Licensing
 
-Sonivra is licensed under [GPL-3.0-only](LICENSE). The statically linked Rust crates and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Sonivra is licensed under [GPL-3.0-only](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the statically linked Rust dependencies and their licenses.
 
-Speech models and inference runtimes are not distributed with the program. They are obtained from their original sources when the user requests a download, each under its own license, recorded in `catalog.json` and `runtimes.json`. The PLaMo translation model, for example, is under the PLaMo Community License.
+Models and inference runtimes are downloaded from their upstream sources when you request them. They are not bundled with the app, and each has its own license. The download catalogs, `catalog.json` and `runtimes.json`, record those licenses. PLaMo models, for example, use the PLaMo Community License.
 
-The Japanese clips in `tests/audio` are taken from Google FLEURS (CC BY 4.0). See [tests/audio/ATTRIBUTION.md](tests/audio/ATTRIBUTION.md).
+The Japanese test clips in `tests/audio` come from Google FLEURS under CC BY 4.0. See [the audio attribution](tests/audio/ATTRIBUTION.md).
