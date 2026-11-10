@@ -1,0 +1,156 @@
+[
+  {
+    "id": "sakasegawa/Qwen3-ASR-1.7B-GGUF",
+    "revision": "81e2423d24073cdeeccb5951df16accc89e075a2",
+    "file": "Qwen3-ASR-1.7B-Q4_K.gguf",
+    "size": 1159383712,
+    "sha256": "38f6f0ca89e51c4adee8313016a580b297f42753829b93fce7e820668bf4c8b7",
+    "url": "https://huggingface.co/sakasegawa/Qwen3-ASR-1.7B-GGUF/resolve/81e2423d24073cdeeccb5951df16accc89e075a2/Qwen3-ASR-1.7B-Q4_K.gguf",
+    "kind": "asr",
+    "architecture": "qwen3-asr",
+    "license": "apache-2.0"
+  },
+  {
+    "id": "sakasegawa/Qwen3-ASR-0.6B-GGUF",
+    "revision": "ee78f8709547f39bea3b924a16c72403826cac92",
+    "file": "Qwen3-ASR-0.6B-Q4_K.gguf",
+    "size": 511168128,
+    "sha256": "981c7842de271f53684ff83362c4c9a2d84394d4d7acadabddaa1d3a7b51c0fa",
+    "url": "https://huggingface.co/sakasegawa/Qwen3-ASR-0.6B-GGUF/resolve/ee78f8709547f39bea3b924a16c72403826cac92/Qwen3-ASR-0.6B-Q4_K.gguf",
+    "kind": "asr",
+    "architecture": "qwen3-asr",
+    "license": "apache-2.0"
+  },
+  {
+    "id": "sakasegawa/Haas-ja-v1.0-GGUF",
+    "revision": "6b965d5007ba780585de51549d57a8c1c0d67c7e",
+    "file": "Haas-616M-ja-v1.0-Q8_0.gguf",
+    "size": 656381472,
+    "sha256": "cd5f60b2f1c411404b83fca4a65e3ce30a26d9e951b6a346529e65f22758afeb",
+    "url": "https://huggingface.co/sakasegawa/Haas-ja-v1.0-GGUF/resolve/6b965d5007ba780585de51549d57a8c1c0d67c7e/Haas-616M-ja-v1.0-Q8_0.gguf",
+    "kind": "asr",
+    "architecture": "fastconformer",
+    "license": "apache-2.0"
+  },
+  {
+    "id": "sakasegawa/parakeet-tdt_ctc-0.6b-ja-GGUF",
+    "revision": "f7cb5387e1e76385456b7a792054565ecf177417",
+    "file": "parakeet-tdt_ctc-0.6B-ja-Q8_0.gguf",
+    "size": 661012416,
+    "sha256": "6ff90c5240f0778dfb44816916eb3c8e634645e120170d6ae43c0f50a11d79d0",
+    "url": "https://huggingface.co/sakasegawa/parakeet-tdt_ctc-0.6b-ja-GGUF/resolve/f7cb5387e1e76385456b7a792054565ecf177417/parakeet-tdt_ctc-0.6B-ja-Q8_0.gguf",
+    "kind": "asr",
+    "architecture": "fastconformer",
+    "license": "cc-by-4.0"
+  },
+  {
+    "id": "sakasegawa/reazonspeech-nemo-v2-GGUF",
+    "revision": "ed04d9ee2cd156414982a7c0f6123c6fd1093904",
+    "file": "reazonspeech-nemo-619M-v2-Q8_0.gguf",
+    "size": 660910656,
+    "sha256": "944411cb740938f858c939aa1d42f7eb4bb884fc350d9daae8b7e724853e54a3",
+    "url": "https://huggingface.co/sakasegawa/reazonspeech-nemo-v2-GGUF/resolve/ed04d9ee2cd156414982a7c0f6123c6fd1093904/reazonspeech-nemo-619M-v2-Q8_0.gguf",
+    "kind": "asr",
+    "architecture": "fastconformer",
+    "license": "apache-2.0"
+  },
+  {
+    "id": "pfnet/plamo-3-translate-2b-GGUF",
+    "revision": "4f672106b847200bfdc0f6af6c321cd94eba1aed",
+    "file": "plamo-3-translate-2b-Q4_K_M.gguf",
+    "size": 1807203040,
+    "sha256": "1ffd9073afcc70e35ccc942428aa2b73d7aa2b9ea779bf504b775369e0276c13",
+    "url": "https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF/resolve/4f672106b847200bfdc0f6af6c321cd94eba1aed/plamo-3-translate-2b-Q4_K_M.gguf",
+    "kind": "translation",
+    "architecture": "plamo3",
+    "license": "PLaMo Community License"
+  },
+  {
+    "id": "pfnet/plamo-3-translate-0.8b-GGUF",
+    "revision": "1cf96ae02133958a20074bfdfab76517bb737d00",
+    "file": "plamo-3-translate-0.8b-Q4_K_M.gguf",
+    "size": 573126848,
+    "sha256": "70891ec70dc7ab4205745a38307867c2881b99239f20327927633abfe4bc9ec6",
+    "url": "https://huggingface.co/pfnet/plamo-3-translate-0.8b-GGUF/resolve/1cf96ae02133958a20074bfdfab76517bb737d00/plamo-3-translate-0.8b-Q4_K_M.gguf",
+    "kind": "translation",
+    "architecture": "plamo3",
+    "license": "PLaMo Community License"
+  },
+  {
+    "id": "pfnet/plamo-3-translate-8b-GGUF",
+    "revision": "c67efa4eefdc14d3c97bf8f4f35ee58e2ecd2f42",
+    "file": "plamo-3-translate-8b-Q4_K_M.gguf",
+    "size": 5280445728,
+    "sha256": "94e5d3f91b421f7c8900ddaac27b11a19f7441426c954bbb25a2fd60a1640187",
+    "url": "https://huggingface.co/pfnet/plamo-3-translate-8b-GGUF/resolve/c67efa4eefdc14d3c97bf8f4f35ee58e2ecd2f42/plamo-3-translate-8b-Q4_K_M.gguf",
+    "kind": "translation",
+    "architecture": "plamo3",
+    "license": "PLaMo Community License"
+  },
+  {
+    "id": "sakasegawa/Qwen3-ASR-1.7B-GGUF",
+    "revision": "81e2423d24073cdeeccb5951df16accc89e075a2",
+    "file": "Qwen3-ASR-1.7B-Q8_0.gguf",
+    "size": 2176109216,
+    "sha256": "5f219b78a1d9c3b9e97da27708b36f8a0bc1bfc1650b541c0a6dbaf87c9a62d0",
+    "url": "https://huggingface.co/sakasegawa/Qwen3-ASR-1.7B-GGUF/resolve/81e2423d24073cdeeccb5951df16accc89e075a2/Qwen3-ASR-1.7B-Q8_0.gguf",
+    "kind": "asr",
+    "architecture": "qwen3-asr",
+    "license": "apache-2.0"
+  },
+  {
+    "id": "sakasegawa/Qwen3-ASR-0.6B-GGUF",
+    "revision": "ee78f8709547f39bea3b924a16c72403826cac92",
+    "file": "Qwen3-ASR-0.6B-Q8_0.gguf",
+    "size": 841502336,
+    "sha256": "416e10c15b4a3d9002bd337d18fc450233fdf68502b6e10d1379d2789838afd0",
+    "url": "https://huggingface.co/sakasegawa/Qwen3-ASR-0.6B-GGUF/resolve/ee78f8709547f39bea3b924a16c72403826cac92/Qwen3-ASR-0.6B-Q8_0.gguf",
+    "kind": "asr",
+    "architecture": "qwen3-asr",
+    "license": "apache-2.0"
+  },
+  {
+    "id": "sakasegawa/Haas-ja-v1.0-GGUF",
+    "revision": "6b965d5007ba780585de51549d57a8c1c0d67c7e",
+    "file": "Haas-616M-ja-v1.0-Q4_K.gguf",
+    "size": 351901216,
+    "sha256": "d24d53f29b75214a933ff482b0de1217e0a800f4118cca39ad6cf03609a89d6f",
+    "url": "https://huggingface.co/sakasegawa/Haas-ja-v1.0-GGUF/resolve/6b965d5007ba780585de51549d57a8c1c0d67c7e/Haas-616M-ja-v1.0-Q4_K.gguf",
+    "kind": "asr",
+    "architecture": "fastconformer",
+    "license": "apache-2.0"
+  },
+  {
+    "id": "sakasegawa/parakeet-tdt-0.6b-v3-GGUF",
+    "revision": "b7ed82dbfba6e63da0ef9cf5104f5fc67da44414",
+    "file": "parakeet-tdt-0.6B-v3-Q8_0.gguf",
+    "size": 668107680,
+    "sha256": "7e61f3f5bb8db536ae649a541eb23349833d3d62565aff1da5bcd7c4f163639a",
+    "url": "https://huggingface.co/sakasegawa/parakeet-tdt-0.6b-v3-GGUF/resolve/b7ed82dbfba6e63da0ef9cf5104f5fc67da44414/parakeet-tdt-0.6B-v3-Q8_0.gguf",
+    "kind": "asr",
+    "architecture": "fastconformer",
+    "license": "cc-by-4.0"
+  },
+  {
+    "id": "tencent/Hy-MT2-1.8B-GGUF",
+    "revision": "a0c709d9fac510f2c807aa3af52872340dc37a4a",
+    "file": "Hy-MT2-1.8B-Q4_K_M.gguf",
+    "size": 1133080448,
+    "sha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+    "url": "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/a0c709d9fac510f2c807aa3af52872340dc37a4a/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "kind": "translation",
+    "architecture": "hy-mt2",
+    "license": "apache-2.0"
+  },
+  {
+    "id": "tencent/Hy-MT2-7B-GGUF",
+    "revision": "ab8472660ac61fac25f1af43fac2599d52a8a775",
+    "file": "Hy-MT2-7B-Q4_K_M.gguf",
+    "size": 4624648896,
+    "sha256": "9f96256500f3fc1ab4d64336b58f52a949a95ad7516b0c229476eef782f9f77b",
+    "url": "https://huggingface.co/tencent/Hy-MT2-7B-GGUF/resolve/ab8472660ac61fac25f1af43fac2599d52a8a775/Hy-MT2-7B-Q4_K_M.gguf",
+    "kind": "translation",
+    "architecture": "hy-mt2",
+    "license": "apache-2.0"
+  }
+]

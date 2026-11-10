@@ -1,0 +1,6 @@
+use serde::Deserialize;
+#[derive(Deserialize)]pub struct Language{pub name:String,pub code:String}
+pub fn translation()->Vec<Language>{serde_json::from_str(include_str!("../languages.json").trim_start_matches('\u{feff}')).expect("language catalog")}
+pub fn asr()->Vec<Language>{let all=translation();let mut out=vec![Language{code:"auto".into(),name:"Automatic / 自動偵測 / 自動判定".into()}];for code in ["ja","en","zh","yue","ko","ar","cs","da","de","el","es","fa","fi","fil","fr","hi","hu","id","it","mk","ms","nl","pl","pt","ro","ru","sv","th","tr","vi"]{let name=match code{"ja"=>"日本語","en"=>"English","zh"=>"中文","yue"=>"廣東話","fil"=>"Filipino","cs"=>"Czech","da"=>"Danish","el"=>"Greek","fi"=>"Finnish","mk"=>"Macedonian","pt"=>"Portuguese","ro"=>"Romanian","sv"=>"Swedish",_=>all.iter().find(|l|l.code==code).map_or(code,|l|l.name.as_str())};out.push(Language{code:code.into(),name:name.into()});}out}
+pub fn display(language:&Language)->String{format!("{} · {}",language.code,match language.code.as_str(){"ja"=>"日本語","zh-hant"=>"繁體中文","zh-hans"=>"简体中文","en"=>"English",_=>&language.name})}
+#[cfg(test)]mod tests{use super::*;#[test]fn published_language_counts(){assert_eq!(translation().len(),53);assert_eq!(asr().len(),31);assert!(translation().iter().any(|l|l.code=="zh-hant"));}}

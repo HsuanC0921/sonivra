@@ -1,0 +1,1199 @@
+import { Button, ComboBox, SpinBox, LineEdit, TextEdit, ScrollView, Palette } from "std-widgets.slint";
+
+// Every visible string goes through I18n.tr with a semantic key from locales/*.json.
+export global I18n {
+    in property <int> lang;
+    pure callback t(int, string) -> string;
+    pure public function tr(key: string) -> string { return self.t(self.lang, key); }
+}
+
+export struct ModelRow {
+    name: string, purpose: string, size: string, license: string, state: string,
+    // 0 not downloaded, 1 downloading, 2 downloaded, 3 selected, 4 loaded, 5 failed
+    state-kind: int, progress: float, path: string, kind: int, recommended: bool, verified: bool,
+    can-download: bool, can-use: bool, can-remove: bool,
+}
+
+export struct HistoryLine { source: string, target: string }
+
+component Icon inherits Text { font-family: "Segoe Fluent Icons"; font-size: 14px; vertical-alignment: center; horizontal-alignment: center; }
+
+component BarButton inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;
+    in property <bool> compact;
+    in property <bool> emphasized;
+    in property <bool> enabled: true;
+    callback clicked;
+    property <color> fg: !root.enabled ? #f3f6f966 : root.emphasized ? #1d1606 : #f3f6f9;
+    height: 30px; border-radius: 6px; min-width: 32px;
+    background: root.emphasized && root.enabled ? (touch.pressed ? #c98f2c : touch.has-hover ? #ecb352 : #e0a43a) : !root.enabled ? transparent : touch.pressed ? #ffffff38 : (touch.has-hover || focus.has-focus) ? #ffffff24 : transparent;
+    accessible-role: button; accessible-label: root.label; accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    focus := FocusScope { key-pressed(e) => { if root.enabled && (e.text == " " || e.text == "\n") { root.clicked(); return accept; } return reject; } }
+    HorizontalLayout { padding-left: 8px; padding-right: 8px; spacing: 6px; alignment: LayoutAlignment.center;
+        Icon { text: root.icon; color: root.fg; }
+        if !root.compact : Text { text: root.label; color: root.fg; font-size: 13px; font-weight: root.emphasized ? 600 : 400; vertical-alignment: center; }
+    }
+    touch := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+    Rectangle { border-width: focus.has-focus ? 1px : 0px; border-color: #9fd8ff; border-radius: 6px; }
+}
+
+// Round colour chip for the quick style strip.
+component Swatch inherits Rectangle {
+    in property <color> fill;
+    in property <float> cover: -1;    // >= 0 draws a backdrop-coverage chip instead of a colour
+    in property <bool> selected;
+    in property <string> label;
+    callback clicked;
+    width: 26px; height: 30px;
+    accessible-role: button; accessible-label: root.label; accessible-checked: root.selected;
+    accessible-action-default => { root.clicked(); }
+    Rectangle { x: 3px; y: 5px; width: 20px; height: 20px; border-radius: root.cover >= 0 ? 4px : 10px; clip: true;
+        background: root.cover >= 0 ? #c9c4bb : root.fill;
+        if root.cover >= 0 : Rectangle { background: #05080c.with-alpha(root.cover); }
+        Rectangle { border-radius: parent.border-radius; border-width: root.selected ? 2px : 1px; border-color: root.selected ? #e0a43a : touch.has-hover ? #ffffff99 : #ffffff40; }
+    }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+// Subtitle line with optional outline (8 offset copies) or drop shadow. Works with the software renderer.
+component SubText inherits Rectangle {
+    in property <string> text;
+    in property <string> face;
+    in property <length> size;
+    in property <color> tint;
+    in property <int> effect;
+    in property <bool> bold;
+    in property <int> align: 1;        // 0 left, 1 center, 2 right
+    in property <float> outline: 2;    // 1 thin .. 4 thick
+    in property <color> edge: #000000;
+    in property <float> alpha: 1;
+    opacity: root.alpha;
+    property <length> o: max(1px, root.size / 16 * root.outline / 2);
+    property <TextHorizontalAlignment> h: root.align == 0 ? TextHorizontalAlignment.left : root.align == 2 ? TextHorizontalAlignment.right : TextHorizontalAlignment.center;
+    preferred-height: main.preferred-height; min-height: main.min-height;
+    property <length> w: min(main.preferred-width, root.width);
+    // Band: a box that hugs the text, so the picture around it stays visible.
+    if root.effect == 3 : Rectangle { width: root.w + root.size * 0.7; height: root.height + root.size * 0.16;
+        x: root.align == 0 ? -root.size * 0.35 : root.align == 2 ? root.width - root.w - root.size * 0.35 : (root.width - self.width) / 2; y: -root.size * 0.08;
+        background: root.edge.with-alpha(0.62); border-radius: 4px; }
+    // Outline: a dense inner ring plus a faint outer ring reads as a soft edge instead of eight hard copies.
+    for d in root.effect == 1 ? [{x: -root.o, y: 0px, a: 0.92}, {x: root.o, y: 0px, a: 0.92}, {x: 0px, y: -root.o, a: 0.92}, {x: 0px, y: root.o, a: 0.92}, {x: -root.o * 0.7, y: -root.o * 0.7, a: 0.92}, {x: root.o * 0.7, y: root.o * 0.7, a: 0.92}, {x: -root.o * 0.7, y: root.o * 0.7, a: 0.92}, {x: root.o * 0.7, y: -root.o * 0.7, a: 0.92},
+            {x: -root.o * 1.7, y: 0px, a: 0.3}, {x: root.o * 1.7, y: 0px, a: 0.3}, {x: 0px, y: -root.o * 1.7, a: 0.3}, {x: 0px, y: root.o * 1.7, a: 0.3}, {x: -root.o * 1.2, y: -root.o * 1.2, a: 0.3}, {x: root.o * 1.2, y: root.o * 1.2, a: 0.3}, {x: -root.o * 1.2, y: root.o * 1.2, a: 0.3}, {x: root.o * 1.2, y: -root.o * 1.2, a: 0.3}]
+        : root.effect == 2 ? [{x: root.o * 2.4, y: root.o * 2.4, a: 0.28}, {x: root.o * 1.2, y: root.o * 1.2, a: 0.72}] : [] : Text {
+        x: d.x; y: d.y; width: root.width; height: root.height; text: root.text; font-family: root.face; font-size: root.size;
+        font-weight: root.bold ? 700 : 600; color: root.edge.with-alpha(d.a); wrap: word-wrap; horizontal-alignment: root.h; vertical-alignment: center;
+    }
+    main := Text { width: root.width; height: root.height; text: root.text; font-family: root.face; font-size: root.size; font-weight: root.bold ? 700 : 600; color: root.tint; wrap: word-wrap; horizontal-alignment: root.h; vertical-alignment: center; }
+}
+
+component Edge inherits TouchArea {
+    in property <int> dir;
+    in property <MouseCursor> cursor;
+    callback down(int);
+    mouse-cursor: root.cursor;
+    pointer-event(e) => { if e.kind == PointerEventKind.down && e.button == PointerEventButton.left { root.down(root.dir); } }
+}
+
+component SubtitlePanel inherits HorizontalLayout {
+    in property <string> source;
+    in property <string> target;
+    in property <string> pending;
+    in property <string> activity;
+    in property <string> interim;
+    in property <string> interim-target;
+    in property <int> history-mode;
+    in property <[HistoryLine]> history;
+    in property <string> source-face: "Yu Gothic UI";
+    in property <string> target-face: "Microsoft JhengHei UI";
+    in property <int> size: 30;
+    in property <int> gap: 6;
+    in property <int> effect: 1;
+    in property <float> bg-opacity: 0.45;
+    in property <bool> show-source: true;
+    in property <bool> show-target: true;
+    in property <bool> translation-first;
+    in property <color> source-tint: #e9eef4;
+    in property <color> target-tint: #fff3cf;
+    in property <color> panel-color: #05080c;
+    in property <float> source-scale: 0.78;
+    in property <int> align: 1;
+    in property <float> outline: 2;
+    in property <bool> source-bold;
+    in property <bool> target-bold: true;
+    in property <bool> fit;
+    in property <length> radius: 8px;
+    in property <color> edge-color: #000000;
+    in property <float> text-alpha: 1;
+    property <length> source-size: root.size * (root.show-target ? root.source-scale : 1) * 1px;
+    alignment: !root.fit ? LayoutAlignment.stretch : root.align == 0 ? LayoutAlignment.start : root.align == 2 ? LayoutAlignment.end : LayoutAlignment.center;
+    Rectangle { background: root.panel-color.with-alpha(root.bg-opacity); border-radius: root.radius;
+        VerticalLayout { padding: 10px; padding-left: 16px; padding-right: 16px; spacing: root.gap * 1px;
+            // Earlier lines stay above, smaller and dimmed, so a missed line can still be read.
+            for h[i] in root.history : Rectangle { opacity: max(0.28, 0.66 - 0.07 * (root.history.length - 1 - i)); preferred-height: col.preferred-height;
+                col := VerticalLayout { width: parent.width; spacing: 0px;
+                    // 0 translation, 1 original, 2 both. A line without a translation yet falls back to its original.
+                    for part in [0, 1] : Rectangle {
+                        property <bool> is-src: root.translation-first ? part == 1 : part == 0;
+                        property <string> body: self.is-src ? ((root.history-mode != 0 || h.target == "") ? h.source : "") : (root.history-mode != 1 ? h.target : "");
+                        min-height: 0px; preferred-height: self.body != "" ? t.preferred-height : 0px; max-height: self.body != "" ? t.preferred-height : 0px; visible: self.body != "";
+                        t := SubText { visible: parent.body != ""; width: parent.width; text: parent.body; face: parent.is-src ? root.source-face : root.target-face; size: root.size * 0.62px; tint: parent.is-src ? root.source-tint : root.target-tint; effect: root.effect; align: root.align; outline: root.outline; edge: root.edge-color; alpha: root.text-alpha; }
+                    }
+                }
+            }
+            if root.translation-first && root.show-target && root.target != "" : SubText { text: root.target; face: root.target-face; size: root.size * 1px; tint: root.target-tint; effect: root.effect; bold: root.target-bold; align: root.align; outline: root.outline; edge: root.edge-color; alpha: root.text-alpha; }
+            if root.translation-first && root.show-target && root.target == "" && root.pending != "" : Text { text: root.pending; color: root.target-tint.with-alpha(0.6); font-size: max(12px, root.size * 0.5px); horizontal-alignment: center; }
+            if root.show-source && root.source != "" : SubText { text: root.source; face: root.source-face; size: root.source-size; tint: root.source-tint; effect: root.effect; bold: root.source-bold; align: root.align; outline: root.outline; edge: root.edge-color; alpha: root.text-alpha; }
+            if !root.translation-first && root.show-target && root.target != "" : SubText { text: root.target; face: root.target-face; size: root.size * 1px; tint: root.target-tint; effect: root.effect; bold: root.target-bold; align: root.align; outline: root.outline; edge: root.edge-color; alpha: root.text-alpha; }
+            if !root.translation-first && root.show-target && root.target == "" && root.pending != "" : Text { text: root.pending; color: root.target-tint.with-alpha(0.6); font-size: max(12px, root.size * 0.5px); horizontal-alignment: center; }
+            // Provisional recognition of the sentence still being spoken.
+            if root.interim != "" : Rectangle { opacity: 0.55; preferred-height: iv.preferred-height;
+                iv := VerticalLayout { spacing: 0px;
+                    next := SubText { text: root.interim; face: root.source-face; size: root.source-size; tint: root.source-tint; effect: root.effect; align: root.align; outline: root.outline; edge: root.edge-color; alpha: root.text-alpha; }
+                    if root.interim-target != "" && root.show-target : SubText { text: root.interim-target; face: root.target-face; size: root.size * 0.8px; tint: root.target-tint; effect: root.effect; align: root.align; outline: root.outline; edge: root.edge-color; alpha: root.text-alpha; }
+                }
+            }
+        }
+        if root.activity != "" : Text { x: parent.width - self.width - 8px; y: 4px; text: root.activity; color: #c9d3dc; font-size: 11px; }
+    }
+}
+
+export component Overlay inherits Window {
+    title: "Sonivra"; no-frame: true; always-on-top: true; background: transparent; default-font-family: I18n.lang == 2 ? "Yu Gothic UI" : I18n.lang == 1 ? "Segoe UI" : "Microsoft JhengHei UI";
+    min-width: 320px; min-height: 80px;
+    in property <image> app-icon; icon: root.app-icon;
+    in property <bool> running;
+    in property <bool> loading;
+    in property <bool> paused;
+    in property <bool> locked;
+    in property <bool> pass-through;
+    in property <bool> preview;
+    in property <bool> needs-setup;
+    in property <string> source;
+    in property <string> target;
+    in property <string> pending;      // e.g. "Translating" shown where the translation will appear
+    in property <string> activity;     // small corner hint, e.g. recognizing next sentence
+    in property <string> status-line;  // shown when there is no subtitle text
+    in property <int> status-level;    // 0 quiet (hidden while locked), 1 info, 2 problem
+    in property <string> lock-hint;
+    in property <string> scroll-badge;   // non-empty while showing an earlier line
+    in property <int> bar-mode;           // 0 always, 1 on hover, 2 hidden
+    in property <bool> anchor-top;
+    in property <bool> show-status: true;
+    in property <color> edge-color: #000000;
+    in property <float> text-alpha: 1;
+    property <bool> frame-hover;
+    property <bool> bar-hover;
+    in property <string> source-face: "Yu Gothic UI";
+    in property <string> target-face: "Microsoft JhengHei UI";
+    in property <int> size: 30;
+    in property <int> gap: 6;
+    in property <int> effect: 1;
+    in property <float> bg-opacity: 0.45;
+    in property <bool> show-source: true;
+    in property <bool> show-target: true;
+    in property <bool> translation-first;
+    in property <[HistoryLine]> history;
+    in property <int> history-mode;
+    in property <color> source-tint: #e9eef4;
+    in property <color> target-tint: #fff3cf;
+    in property <color> panel-color: #05080c;
+    in property <float> source-scale: 0.78;
+    in property <int> align: 1;
+    in property <float> outline: 2;
+    in property <bool> source-bold;
+    in property <bool> target-bold: true;
+    in property <bool> fit;
+    in property <length> radius: 8px;
+    callback drag();
+    /// Edge or corner being dragged, in winit ResizeDirection order: E N NE NW S SE SW W.
+    callback resize(int);
+    callback start();
+    callback pause();
+    callback stop();
+    callback toggle-lock();
+    callback open-settings();
+    callback quit();
+    callback toggle-bar();
+    callback save-log();
+    callback quick-style(int, int);       // kind, value: see gui.rs
+    in-out property <bool> style-open;
+    property <[color]> swatches: [#FFF3CF, #FFFFFF, #FFE15A, #8FE3FF, #B6F0A8, #FFB8D2];
+    callback end-preview();
+    callback scroll-by(int);              // +1 older, -1 newer
+    callback back-to-live();
+    property <bool> chrome: !root.locked;
+    // Hover bar: appears as soon as the pointer is anywhere on the subtitles and lingers a moment after it leaves.
+    property <bool> any-hover: root.frame-hover || root.bar-hover || hover.has-hover;
+    property <bool> bar-shown;
+    changed any-hover => { if root.any-hover { root.bar-shown = true; } }
+    Timer { interval: 900ms; running: !root.any-hover && root.bar-shown; triggered => { root.bar-shown = false; } }
+    in property <string> interim;
+    in property <string> interim-target;
+    property <bool> has-text: root.interim != "" || (root.show-source && root.source != "") || (root.show-target && (root.target != "" || root.pending != ""));
+    init => { Palette.color-scheme = ColorScheme.dark; }
+
+    hover := TouchArea { enabled: !root.pass-through; pointer-event(e) => { if e.kind == PointerEventKind.down && e.button == PointerEventButton.right { root.open-settings(); } } scroll-event(e) => { if e.delta-y != 0 && (e.modifiers.control || e.modifiers.shift) { root.quick-style(e.modifiers.control ? 0 : 6, e.delta-y > 0 ? 1 : -1); return accept; } if e.delta-y > 0 { root.scroll-by(1); return accept; } if e.delta-y < 0 { root.scroll-by(-1); return accept; } return reject; } }
+    if root.chrome : Rectangle {
+        background: #121315.with-alpha(max(root.bg-opacity * 0.5, 0.14)); border-radius: 10px; border-width: 1px; border-color: #e0a43a99;
+        TouchArea { mouse-cursor: move; changed has-hover => { root.frame-hover = self.has-hover; } pointer-event(e) => { if e.kind == PointerEventKind.down && e.button == PointerEventButton.left { root.drag(); } if e.kind == PointerEventKind.down && e.button == PointerEventButton.right { root.open-settings(); } } scroll-event(e) => { if e.delta-y != 0 && (e.modifiers.control || e.modifiers.shift) { root.quick-style(e.modifiers.control ? 0 : 6, e.delta-y > 0 ? 1 : -1); return accept; } if e.delta-y > 0 { root.scroll-by(1); return accept; } if e.delta-y < 0 { root.scroll-by(-1); return accept; } return reject; } }
+    }
+    VerticalLayout {
+        if root.chrome && root.bar-mode != 2 : Rectangle { height: 42px; background: #121315e6; border-radius: 10px;
+            opacity: root.bar-mode == 0 || root.bar-shown ? 1 : 0; animate opacity { duration: 160ms; }
+            // The buttons sit inside this area, so pointing at them keeps the bar open.
+            TouchArea { changed has-hover => { root.bar-hover = self.has-hover; }
+            HorizontalLayout { padding: 6px; padding-left: 12px; spacing: 2px;
+                Rectangle { horizontal-stretch: 1;
+                    TouchArea { mouse-cursor: move; changed has-hover => { root.bar-hover = self.has-hover; } pointer-event(e) => { if e.kind == PointerEventKind.down && e.button == PointerEventButton.left { root.drag(); } } }
+                    HorizontalLayout { spacing: 8px; alignment: LayoutAlignment.start;
+                        Rectangle { width: 9px; height: 9px; y: (parent.height - 9px) / 2; border-radius: 4.5px; background: root.status-level == 2 ? #ff7a6b : root.running && !root.paused ? #5bbf7a : root.loading ? #ffd166 : #8a96a3; }
+                        Text { text: "Sonivra"; color: #f3f6f9; font-size: 13px; font-weight: 600; vertical-alignment: center; }
+                        Text { text: root.status-line; color: #c9d3dc; font-size: 12px; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                    }
+                }
+                if !root.running && !root.loading : BarButton { icon: "\u{E768}"; label: I18n.tr("action.start"); emphasized: true; clicked => { root.start(); } }
+                if root.running && !root.paused : BarButton { icon: "\u{E769}"; label: I18n.tr("action.pause"); clicked => { root.pause(); } }
+                if root.running && root.paused : BarButton { icon: "\u{E768}"; label: I18n.tr("action.resume"); emphasized: true; clicked => { root.pause(); } }
+                if root.running || root.loading : BarButton { icon: "\u{E71A}"; label: I18n.tr("action.stop"); clicked => { root.stop(); } }
+                BarButton { icon: "\u{E72E}"; label: I18n.tr("action.lock"); clicked => { root.toggle-lock(); } }
+                BarButton { icon: "\u{E74E}"; label: I18n.tr("overlay.save_log"); compact: true; clicked => { root.save-log(); } }
+                BarButton { icon: "\u{E8D2}"; label: I18n.tr("quick.style"); compact: true; emphasized: root.style-open; clicked => { root.style-open = !root.style-open; } }
+                BarButton { icon: root.bar-mode == 0 ? "\u{E70E}" : "\u{E718}"; label: root.bar-mode == 0 ? I18n.tr("overlay.collapse_bar") : I18n.tr("overlay.pin_bar"); compact: true; clicked => { root.toggle-bar(); } }
+                BarButton { icon: "\u{E713}"; label: I18n.tr("action.settings"); compact: true; clicked => { root.open-settings(); } }
+                BarButton { icon: "\u{E8BB}"; label: I18n.tr("action.quit"); compact: true; clicked => { root.quit(); } }
+            }
+            }
+        }
+        // Clipped from the far side: when text outgrows the window, the oldest line goes first, never the newest.
+        Rectangle { vertical-stretch: 1; clip: true; min-height: 0px;
+          VerticalLayout { width: parent.width; height: self.preferred-height; y: root.anchor-top ? 0px : parent.height - self.preferred-height; padding: 12px; padding-top: 6px; spacing: 6px;
+            if root.has-text : SubtitlePanel { source: root.source; target: root.target; pending: root.pending; activity: root.activity; interim: root.interim; interim-target: root.interim-target; history: root.history; history-mode: root.history-mode;
+                source-face: root.source-face; target-face: root.target-face; size: root.size; gap: root.gap; effect: root.effect; bg-opacity: root.bg-opacity;
+                show-source: root.show-source; show-target: root.show-target; translation-first: root.translation-first; source-tint: root.source-tint; target-tint: root.target-tint;
+                panel-color: root.panel-color; source-scale: root.source-scale; align: root.align; outline: root.outline; source-bold: root.source-bold; target-bold: root.target-bold; fit: root.fit; radius: root.radius;
+                edge-color: root.edge-color; text-alpha: root.text-alpha; }
+            if !root.has-text && root.status-line != "" && (root.chrome || root.status-level == 2 || (root.status-level == 1 && root.show-status)) : HorizontalLayout { alignment: LayoutAlignment.center;
+                Rectangle { background: root.status-level == 2 ? #4a1d18e6 : #121315cc; border-radius: 14px; height: 30px; width: pill.preferred-width + 28px;
+                    pill := Text { text: root.status-line; color: root.status-level == 2 ? #ffd2cc : #e6ecf2; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { enabled: root.status-level == 2 || root.needs-setup; mouse-cursor: pointer; clicked => { root.open-settings(); } }
+                }
+            }
+          }
+        }
+    }
+    // Badges float over the top edge so a tall subtitle can never clip them.
+    // Quick style strip: the common look changes without leaving the subtitles.
+    if root.chrome && root.style-open : Rectangle { y: root.bar-mode != 2 ? 48px : 8px; height: 40px;
+        width: min(parent.width - 16px, strip.preferred-width); x: (parent.width - self.width) / 2;
+        background: #121315f2; border-radius: 8px; border-width: 1px; border-color: #ffffff24;
+        TouchArea { }
+        strip := HorizontalLayout { padding: 5px; padding-left: 8px; padding-right: 8px; spacing: 2px;
+            BarButton { icon: "\u{E8E7}"; label: I18n.tr("hotkey.smaller"); compact: true; enabled: root.size > 12; clicked => { root.quick-style(0, -1); } }
+            Text { text: root.size; color: #f3f6f9; font-size: 13px; min-width: 22px; horizontal-alignment: center; vertical-alignment: center; }
+            BarButton { icon: "\u{E8E8}"; label: I18n.tr("hotkey.bigger"); compact: true; enabled: root.size < 72; clicked => { root.quick-style(0, 1); } }
+            Rectangle { width: 1px; background: #ffffff26; }
+            BarButton { icon: "\u{E8D2}"; label: root.target-face; clicked => { root.quick-style(4, 0); } }
+            Rectangle { width: 1px; background: #ffffff26; }
+            for c[i] in root.swatches : Swatch { fill: c; label: I18n.tr("subs.target_color"); selected: root.target-tint == c; clicked => { root.quick-style(1, i); } }
+            Rectangle { width: 1px; background: #ffffff26; }
+            for a[i] in [0, 0.35, 0.6, 0.85] : Swatch { cover: a; label: I18n.tr("subs.opacity"); selected: i == (root.bg-opacity < 0.175 ? 0 : root.bg-opacity < 0.475 ? 1 : root.bg-opacity < 0.725 ? 2 : 3); clicked => { root.quick-style(2, i); } }
+            Rectangle { width: 1px; background: #ffffff26; }
+            BarButton { icon: "\u{E790}"; label: root.effect == 0 ? I18n.tr("subs.effect_none") : root.effect == 1 ? I18n.tr("subs.effect_outline") : root.effect == 2 ? I18n.tr("subs.effect_shadow") : I18n.tr("subs.effect_band"); clicked => { root.quick-style(3, 0); } }
+            BarButton { icon: "\u{E712}"; label: I18n.tr("quick.more"); compact: true; clicked => { root.quick-style(5, 0); } }
+        }
+    }
+    if (root.preview || root.scroll-badge != "") && !(root.chrome && root.style-open) : HorizontalLayout { y: root.chrome && root.bar-mode != 2 ? 48px : 8px; height: 26px; alignment: LayoutAlignment.end; padding-right: 16px; spacing: 6px;
+        if root.preview : Rectangle { background: #ffd166; border-radius: 4px; width: badge.preferred-width + 16px;
+            badge := Text { text: I18n.tr("overlay.preview_badge"); color: #1b1b1b; font-size: 12px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+        }
+        if root.preview && root.chrome : Rectangle { background: #121315e6; border-radius: 4px; width: end-preview.preferred-width;
+            end-preview := BarButton { icon: "\u{E711}"; label: I18n.tr("overlay.end_preview"); clicked => { root.end-preview(); } }
+        }
+        if root.scroll-badge != "" && !root.preview : Rectangle { background: #e0a43a; border-radius: 4px; width: scroll-text.preferred-width + 16px;
+            scroll-text := Text { text: root.scroll-badge; color: #1d1606; font-size: 12px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+        }
+        if root.scroll-badge != "" && !root.preview && !root.pass-through : Rectangle { background: #121315e6; border-radius: 4px; width: live.preferred-width;
+            live := BarButton { icon: "\u{E72A}"; label: I18n.tr("overlay.back_to_live"); clicked => { root.back-to-live(); } }
+        }
+    }
+    if root.lock-hint != "" : Rectangle { x: (parent.width - self.width) / 2; y: 8px; height: 28px; width: hint.preferred-width + 24px; background: #121315e6; border-radius: 14px;
+        hint := Text { text: root.lock-hint; color: #f3f6f9; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+    }
+    Rectangle { x: parent.width - 40px; y: 6px; width: 34px; height: 30px; border-radius: 6px; background: unlock.has-hover ? #3a3b3f : #121315cc;
+        visible: root.locked && !root.pass-through && (hover.has-hover || unlock.has-hover);
+        accessible-role: button; accessible-label: I18n.tr("action.unlock");
+        Icon { text: "\u{E785}"; color: #f3f6f9; }
+        unlock := TouchArea { enabled: root.locked && !root.pass-through; clicked => { root.toggle-lock(); } }
+    }
+    // Every edge and corner resizes while unlocked, like most caption windows.
+    if root.chrome : Edge { x: 14px; y: 0; width: parent.width - 28px; height: 6px; cursor: ns-resize; dir: 1; down(d) => { root.resize(d); } }
+    if root.chrome : Edge { x: 14px; y: parent.height - 6px; width: parent.width - 28px; height: 6px; cursor: ns-resize; dir: 4; down(d) => { root.resize(d); } }
+    if root.chrome : Edge { x: 0; y: 14px; width: 6px; height: parent.height - 28px; cursor: ew-resize; dir: 7; down(d) => { root.resize(d); } }
+    if root.chrome : Edge { x: parent.width - 6px; y: 14px; width: 6px; height: parent.height - 28px; cursor: ew-resize; dir: 0; down(d) => { root.resize(d); } }
+    if root.chrome : Edge { x: 0; y: 0; width: 14px; height: 14px; cursor: nwse-resize; dir: 3; down(d) => { root.resize(d); } }
+    if root.chrome : Edge { x: parent.width - 14px; y: 0; width: 14px; height: 14px; cursor: nesw-resize; dir: 2; down(d) => { root.resize(d); } }
+    if root.chrome : Edge { x: 0; y: parent.height - 14px; width: 14px; height: 14px; cursor: nesw-resize; dir: 6; down(d) => { root.resize(d); } }
+    if root.chrome : TouchArea { x: parent.width - 20px; y: parent.height - 20px; width: 20px; height: 20px; mouse-cursor: nwse-resize;
+        pointer-event(e) => { if e.kind == PointerEventKind.down && e.button == PointerEventButton.left { root.resize(5); } }
+        Icon { text: "\u{E7EF}"; font-size: 11px; color: #ffffffb0; }
+    }
+}
+
+// ---------------- Settings window ----------------
+
+component NavItem inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;
+    in property <bool> selected;
+    callback activate;
+    height: 38px; border-radius: 6px;
+    background: root.selected ? #ffffff1c : touch.has-hover ? #ffffff10 : transparent;
+    accessible-role: tab; accessible-label: root.label; accessible-item-selected: root.selected; accessible-item-selectable: true;
+    accessible-action-default => { root.activate(); }
+    focus := FocusScope { key-pressed(e) => { if e.text == " " || e.text == "\n" { root.activate(); return accept; } return reject; } }
+    Rectangle { x: 0px; width: 3px; height: 16px; border-radius: 1.5px; background: root.selected ? #e0a43a : transparent; }
+    HorizontalLayout { padding-left: 12px; padding-right: 8px; spacing: 10px;
+        Icon { text: root.icon; width: 18px; color: root.selected ? #ffffff : #c9d3dc; }
+        Text { text: root.label; color: root.selected ? #ffffff : #c9d3dc; font-size: 14px; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+    }
+    touch := TouchArea { clicked => { root.activate(); focus.focus(); } }
+    Rectangle { border-width: focus.has-focus ? 1px : 0px; border-color: #9fd8ff; border-radius: 6px; }
+}
+
+component Card inherits VerticalLayout {
+    in property <string> title;
+    in property <string> note;
+    padding-top: 10px; padding-bottom: 8px; spacing: 12px;
+    if root.title != "" : VerticalLayout { spacing: 8px;
+        HorizontalLayout { spacing: 10px;
+            Text { text: root.title; font-size: 15px; font-weight: 600; color: #f1efe9; vertical-alignment: center; horizontal-stretch: 1; wrap: word-wrap; }
+            if root.note != "" : Text { text: root.note; color: #a8a49b; font-size: 12px; vertical-alignment: center; }
+        }
+        Rectangle { height: 1px; background: #ffffff1a; }
+    }
+    @children
+}
+
+component AccentButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    callback clicked;
+    height: 32px; min-width: label.preferred-width + 28px; border-radius: 5px;
+    background: !root.enabled ? #e0a43a55 : touch.pressed ? #c98f2c : touch.has-hover ? #ecb352 : #e0a43a;
+    accessible-role: button; accessible-label: root.text; accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    focus := FocusScope { key-pressed(e) => { if root.enabled && (e.text == " " || e.text == "\n") { root.clicked(); return accept; } return reject; } }
+    label := Text { text: root.text; color: #1d1606; font-size: 13px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+    touch := TouchArea { enabled: root.enabled; clicked => { root.clicked(); focus.focus(); } }
+    Rectangle { border-width: focus.has-focus ? 2px : 0px; border-color: #f6e3b8; border-radius: 5px; }
+}
+
+component DangerButton inherits Rectangle {
+    in property <string> text;
+    callback clicked;
+    height: 32px; min-width: label.preferred-width + 28px; border-radius: 5px; border-width: 1px;
+    border-color: touch.has-hover ? #ff9a8c : #ff9a8c59; background: touch.pressed ? #ff9a8c26 : touch.has-hover ? #ff9a8c14 : transparent;
+    accessible-role: button; accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+    focus := FocusScope { key-pressed(e) => { if e.text == " " || e.text == "\n" { root.clicked(); return accept; } return reject; } }
+    label := Text { text: root.text; color: #ff9a8c; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); focus.focus(); } }
+    Rectangle { border-width: focus.has-focus ? 2px : 0px; border-color: #ffd2cc; border-radius: 5px; }
+}
+
+component Muted inherits Text { color: #aab6c2; font-size: 12px; wrap: word-wrap; }
+component Label inherits Text { color: Palette.foreground; font-size: 13px; vertical-alignment: center; wrap: word-wrap; }
+
+component Field inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> hint;
+    spacing: 12px;
+    VerticalLayout { width: 34%; alignment: LayoutAlignment.center; spacing: 2px;
+        Label { text: root.label; }
+        if root.hint != "" : Muted { text: root.hint; }
+    }
+    HorizontalLayout { horizontal-stretch: 1; spacing: 8px; alignment: LayoutAlignment.stretch; @children }
+}
+
+
+struct Swatch { c: color, h: string }
+component ColorPicker inherits HorizontalLayout {
+    in-out property <string> value;
+    in property <string> label;
+    callback changed();
+    spacing: 6px;
+    for s in [{c: #ffffff, h: "#FFFFFF"}, {c: #e9eef4, h: "#E9EEF4"}, {c: #fff3cf, h: "#FFF3CF"}, {c: #ffe066, h: "#FFE066"}, {c: #a8e6c1, h: "#A8E6C1"}, {c: #9fd8ff, h: "#9FD8FF"}, {c: #ffb3c7, h: "#FFB3C7"}, {c: #05080c, h: "#05080C"}, {c: #0d2a4a, h: "#0D2A4A"}] : Rectangle {
+        width: 24px; height: 24px; border-radius: 12px; background: s.c; y: (parent.height - 24px) / 2;
+        border-width: root.value == s.h ? 2px : 1px; border-color: root.value == s.h ? #e0a43a : #ffffff40;
+        accessible-role: button; accessible-label: root.label + " " + s.h;
+        TouchArea { mouse-cursor: pointer; clicked => { root.value = s.h; root.changed(); } }
+    }
+    LineEdit { width: 96px; text <=> root.value; accessible-label: root.label; edited => { if self.text.character-count == 7 { root.changed(); } } }
+}
+
+// Theme controls. The std widgets take their accent from the system, which clashed with the amber theme.
+component Toggle inherits Rectangle {
+    in property <string> text;
+    in-out property <bool> checked;
+    in property <bool> enabled: true;
+    callback toggled;
+    accessible-role: checkbox; accessible-label: root.text; accessible-checked: root.checked; accessible-enabled: root.enabled;
+    accessible-action-default => { root.flip(); }
+    function flip() { if root.enabled { root.checked = !root.checked; root.toggled(); } }
+    HorizontalLayout { spacing: 10px;
+        Rectangle { width: 40px; height: 22px; y: (parent.height - 22px) / 2; border-radius: 11px; background: !root.enabled ? #ffffff14 : root.checked ? #e0a43a : #ffffff26;
+            border-width: focus.has-focus ? 2px : 0px; border-color: #f6e3b8;
+            Rectangle { x: root.checked ? parent.width - 19px : 3px; y: 3px; width: 16px; height: 16px; border-radius: 8px; background: root.checked ? #1d1606 : #d8d6d0; animate x { duration: 120ms; } }
+        }
+        if root.text != "" : Text { text: root.text; color: root.enabled ? #ecebe7 : #ecebe766; font-size: 13px; vertical-alignment: center; wrap: word-wrap; }
+    }
+    focus := FocusScope { key-pressed(e) => { if e.text == " " || e.text == "\n" { root.flip(); return accept; } return reject; } }
+    TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.flip(); focus.focus(); } }
+}
+
+component Track inherits Rectangle {
+    in property <float> minimum;
+    in property <float> maximum: 100;
+    in property <float> step: 1;
+    in-out property <float> value;
+    callback changed(float);
+    height: 28px; min-width: 120px;
+    property <float> frac: clamp((root.value - root.minimum) / (root.maximum - root.minimum), 0, 1);
+    accessible-role: slider; accessible-value: root.value; accessible-value-minimum: root.minimum; accessible-value-maximum: root.maximum; accessible-value-step: root.step;
+    accessible-action-increment => { root.set(root.value + root.step); }
+    accessible-action-decrement => { root.set(root.value - root.step); }
+    function set(v: float) {
+        if clamp(round((v - root.minimum) / root.step) * root.step + root.minimum, root.minimum, root.maximum) != root.value {
+            root.value = clamp(round((v - root.minimum) / root.step) * root.step + root.minimum, root.minimum, root.maximum); root.changed(root.value);
+        }
+    }
+    function at(x: length) { root.set(root.minimum + (x - 8px) / max(1px, root.width - 16px) * (root.maximum - root.minimum)); }
+    Rectangle { y: (parent.height - 4px) / 2; height: 4px; border-radius: 2px; background: #ffffff26; }
+    Rectangle { x: 0px; y: (parent.height - 4px) / 2; height: 4px; width: 8px + root.frac * (parent.width - 16px); border-radius: 2px; background: #e0a43a; }
+    Rectangle { x: root.frac * (parent.width - 16px); y: (parent.height - 16px) / 2; width: 16px; height: 16px; border-radius: 8px; background: touch.pressed ? #ffffff : #ecebe7;
+        border-width: focus.has-focus ? 3px : 0px; border-color: #e0a43a; }
+    touch := TouchArea { mouse-cursor: pointer;
+        pointer-event(e) => { if e.kind == PointerEventKind.down { root.at(self.mouse-x); focus.focus(); } }
+        moved => { if self.pressed { root.at(self.mouse-x); } }
+    }
+    focus := FocusScope { key-pressed(e) => {
+        if e.text == Key.LeftArrow || e.text == Key.DownArrow { root.set(root.value - root.step); return accept; }
+        if e.text == Key.RightArrow || e.text == Key.UpArrow { root.set(root.value + root.step); return accept; }
+        if e.text == Key.Home { root.set(root.minimum); return accept; }
+        if e.text == Key.End { root.set(root.maximum); return accept; }
+        return reject; } }
+}
+
+component Bar inherits Rectangle {
+    in property <float> progress;
+    height: 20px; min-width: 60px;
+    accessible-role: progress-indicator; accessible-value: round(clamp(root.progress, 0, 1) * 100);
+    Rectangle { y: (parent.height - 6px) / 2; height: 6px; border-radius: 3px; background: #ffffff1f;
+        Rectangle { x: 0px; width: parent.width * clamp(root.progress, 0, 1); border-radius: 3px; background: #e0a43a; }
+    }
+}
+
+component ValueSlider inherits HorizontalLayout {
+    in property <float> minimum;
+    in property <float> maximum;
+    in property <float> step: 1;
+    in-out property <float> value;
+    in property <string> display;
+    in property <string> label;
+    callback changed(float);
+    spacing: 10px;
+    Track { accessible-label: root.label; minimum: root.minimum; maximum: root.maximum; step: root.step; value <=> root.value; horizontal-stretch: 1; changed(v) => { root.changed(v); } }
+    Text { text: root.display; width: 74px; color: Palette.foreground; font-size: 13px; vertical-alignment: center; horizontal-alignment: right; }
+}
+
+component StepRow inherits HorizontalLayout {
+    in property <int> number;
+    in property <bool> done;
+    in property <string> title;
+    in property <string> detail;
+    spacing: 12px;
+    Rectangle { width: 26px; height: 26px; border-radius: 13px; background: root.done ? #4c9a6a : #ffffff1a;
+        accessible-role: text; accessible-label: root.done ? I18n.tr("setup.done") : I18n.tr("setup.todo");
+        if root.done : Icon { text: "\u{E73E}"; color: white; font-size: 12px; }
+        if !root.done : Text { text: root.number; color: white; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+    }
+    VerticalLayout { horizontal-stretch: 1; spacing: 2px; alignment: LayoutAlignment.center;
+        Label { text: root.title; font-weight: 600; }
+        if root.detail != "" : Muted { text: root.detail; }
+    }
+    HorizontalLayout { spacing: 6px; alignment: LayoutAlignment.end; @children }
+}
+
+export component Settings inherits Window {
+    title: I18n.tr("settings.title"); preferred-width: 900px; preferred-height: 660px; min-width: 660px; min-height: 480px;
+    background: #18191b; default-font-family: I18n.lang == 2 ? "Yu Gothic UI" : I18n.lang == 1 ? "Segoe UI" : "Microsoft JhengHei UI"; default-font-size: 13px;
+    in property <image> app-icon; icon: root.app-icon;
+    in-out property <int> page: 0;
+    in-out property <int> language;
+    // engine state
+    in property <bool> running;
+    in property <bool> loading;
+    in property <bool> paused;
+    in property <string> phase-text;
+    in property <string> device-text;
+    in property <bool> reload-pending;
+    in property <string> error-summary;
+    in property <string> error-fix;
+    in property <string> error-detail;
+    in-out property <bool> show-details;
+    in property <int> error-action;   // 0 none, 1 open models, 2 retry start, 3 open audio, 4 retry download
+    in property <float> rms;
+    in property <bool> voice;
+    in property <string> source;
+    in property <string> target;
+    in property <string> performance;
+    in property <string> model-info;
+    // setup
+    in property <bool> runtime-ok;
+    in property <bool> asr-ok;
+    in property <bool> translation-ok;
+    in property <string> runtime-detail;
+    in property <string> asr-detail;
+    in property <string> translation-detail;
+    in property <string> rec-asr-action;
+    in property <string> rec-translation-action;
+    in property <string> runtime-action;
+    // overlay
+    in-out property <bool> overlay-visible;
+    in-out property <bool> overlay-locked;
+    in-out property <bool> click-through;
+    in-out property <bool> preview;
+    in property <string> hotkey-text;
+    in property <[string]> font-names;
+    in-out property <int> source-font-index;
+    in-out property <int> target-font-index;
+    in-out property <float> font-size: 30;
+    in-out property <float> line-gap: 6;
+    in-out property <float> bg-opacity: 45;
+    in-out property <float> hold-s: 8;
+    in-out property <int> effect: 1;
+    in-out property <int> history-lines: 1;
+    in-out property <bool> interim: true;
+    in-out property <int> history-mode: 0;
+    in-out property <bool> refine: true;
+    in-out property <bool> interim-translate: false;
+    in-out property <string> source-color;
+    in-out property <string> target-color;
+    in-out property <string> panel-color-text;
+    in property <color> source-tint: #e9eef4;
+    in property <color> target-tint: #fff3cf;
+    in property <color> panel-color: #05080c;
+    in-out property <float> source-scale: 78;
+    in-out property <int> align: 1;
+    in-out property <float> outline: 2;
+    in-out property <bool> source-bold;
+    in-out property <bool> target-bold: true;
+    in-out property <bool> fit-text;
+    in-out property <float> radius: 8;
+    in property <string> demo-source;
+    in property <string> demo-target;
+    in-out property <bool> translation-first;
+    in property <string> transcript;
+    in property <[string]> keep-names;
+    in-out property <int> bar-mode;
+    in-out property <bool> anchor-top;
+    in-out property <float> text-opacity: 100;
+    in-out property <string> outline-color: "#000000";
+    in-out property <bool> show-status: true;
+    in property <color> edge-color: #000000;
+    in-out property <int> keep-index: 1;
+    in-out property <bool> save-files;
+    in-out property <bool> mix-mic;
+    in-out property <bool> record-audio;
+    in-out property <bool> live-file;
+    in-out property <bool> autostart;
+    in-out property <string> log-query;
+    in-out property <bool> log-follow: true;
+    in property <string> log-text;
+    in property <string> log-count;
+    in property <string> log-limited;
+    in-out property <int> show-mode: 0;   // 0 both, 1 translation only, 2 source only
+    // audio
+    in property <[string]> audio-names;
+    in property <[string]> app-names;
+    in-out property <int> app-index;
+    in-out property <int> audio-index;
+    in-out property <float> sensitivity: 30;   // 1..100 maps to VAD threshold
+    in property <string> threshold-text;
+    in-out property <float> silence-ms: 450;
+    in-out property <float> min-speech-ms: 100;
+    in-out property <float> max-segment-s: 8;
+    // models
+    in property <[ModelRow]> models;
+    in property <string> hardware-text;
+    in property <string> recommendation;
+    in-out property <int> preference;
+    in-out property <int> gpu-reserve-mb;
+    in-out property <int> runtime-family;
+    in property <[string]> runtime-names;
+    in property <bool> download-busy;
+    in property <float> download-progress;
+    in property <string> download-text;
+    in property <string> asr-path;
+    in property <string> translation-path;
+    // recognition and translation
+    in property <[string]> asr-lang-names;
+    in-out property <int> asr-lang-index;
+    in property <[string]> asr-device-names;
+    in-out property <int> asr-device-index;
+    in-out property <string> asr-prompt;
+    in-out property <bool> translate-enabled: true;
+    in property <[string]> translation-lang-names;
+    in-out property <int> source-lang-index;
+    in-out property <int> target-lang-index;
+    in-out property <int> translation-family;
+    in-out property <string> translation-context;
+    in-out property <string> glossary;
+    in-out property <string> test-text;
+    in property <string> test-result;
+    // advanced
+    in-out property <bool> local-translation: true;
+    in-out property <string> endpoint;
+    in-out property <string> model-id;
+    in-out property <string> asr-runtime;
+    in-out property <string> translation-runtime;
+    in-out property <int> gpu-layers: 99;
+    in-out property <int> context-size: 4096;
+    in-out property <int> max-tokens: 256;
+    in-out property <float> temperature: 0;
+    in-out property <int> debounce-ms: 80;
+    in-out property <int> history-turns: 4;
+    in-out property <int> asr-threads: 8;
+    in-out property <bool> mmap: true;
+
+    callback commit();               // any setting changed; Rust decides what applies immediately
+    callback start();
+    callback pause();
+    callback stop();
+    callback reload();
+    callback error-action-clicked(int);
+    callback dismiss-error();
+    callback reset-overlay();
+    callback snap(int);
+    callback apply-preset(int);
+    callback export-profile();
+    callback import-profile();
+    callback save-transcript(int);        // 0 TXT, 1 SRT
+    callback clear-transcript();
+    callback open-transcripts();
+    callback refresh-audio();
+    callback install-runtimes();
+    callback download-recommended(int);   // 0 ASR, 1 translation
+    callback cancel-download();
+    callback choose-model(int);           // 0 ASR, 1 translation
+    callback choose-runtime(int);
+    callback download-model(int);
+    callback use-model(int);
+    callback remove-model(int);
+    callback apply-recommendation();
+    callback test-translation();
+    callback test-asr();
+    callback open-data-folder();
+
+    init => { Palette.color-scheme = ColorScheme.dark; }
+
+    HorizontalLayout {
+        Rectangle { width: 196px; background: #111214;
+            VerticalLayout { padding: 12px; spacing: 4px;
+                HorizontalLayout { padding: 6px; padding-bottom: 14px; spacing: 8px;
+                    Rectangle { width: 10px; height: 10px; y: (parent.height - 10px) / 2; border-radius: 5px; background: root.error-summary != "" ? #ff7a6b : root.running && !root.paused ? #5bbf7a : root.loading ? #ffd166 : #6b7785; }
+                    Text { text: "Sonivra"; color: white; font-size: 20px; font-weight: 600; }
+                }
+                VerticalLayout { spacing: 2px; accessible-role: tab-list;
+                    NavItem { icon: "\u{E80F}"; label: I18n.tr("nav.home"); selected: root.page == 0; activate => { root.page = 0; } }
+                    NavItem { icon: "\u{E8C1}"; label: I18n.tr("nav.subtitles"); selected: root.page == 1; activate => { root.page = 1; } }
+                    NavItem { icon: "\u{E767}"; label: I18n.tr("nav.audio"); selected: root.page == 2; activate => { root.page = 2; } }
+                    NavItem { icon: "\u{E8F1}"; label: I18n.tr("nav.models"); selected: root.page == 3; activate => { root.page = 3; } }
+                    NavItem { icon: "\u{E8C2}"; label: I18n.tr("nav.language"); selected: root.page == 4; activate => { root.page = 4; } }
+                    NavItem { icon: "\u{E81C}"; label: I18n.tr("nav.transcript"); selected: root.page == 6; activate => { root.page = 6; } }
+                    NavItem { icon: "\u{E9D9}"; label: I18n.tr("nav.advanced"); selected: root.page == 5; activate => { root.page = 5; } }
+                }
+                Rectangle { vertical-stretch: 1; }
+                Muted { text: I18n.tr("ui.language"); }
+                ComboBox { model: ["繁體中文", "English", "日本語"]; current-index <=> root.language; selected => { root.commit(); } }
+                Muted { text: I18n.tr("settings.close_note"); font-size: 11px; }
+            }
+        }
+        VerticalLayout { horizontal-stretch: 1;
+            // Persistent status and transport strip
+            Rectangle { background: #1e1f22; height: 60px;
+                HorizontalLayout { padding: 12px; padding-left: 20px; padding-right: 16px; spacing: 10px;
+                    VerticalLayout { horizontal-stretch: 1; alignment: LayoutAlignment.center; spacing: 2px;
+                        Text { text: root.phase-text; color: white; font-size: 15px; font-weight: 600; overflow: elide; }
+                        if root.device-text != "" : Muted { text: root.device-text; overflow: elide; wrap: no-wrap; }
+                    }
+                    if !root.running && root.loading : Button { text: I18n.tr("action.cancel"); clicked => { root.stop(); } }
+                    if !root.running && !root.loading : AccentButton { text: I18n.tr("action.start"); clicked => { root.start(); } }
+                    if root.running : Button { text: root.paused ? I18n.tr("action.resume") : I18n.tr("action.pause"); clicked => { root.pause(); } }
+                    if root.running : Button { text: I18n.tr("action.stop_unload"); clicked => { root.stop(); } }
+                }
+            }
+            if root.reload-pending : Rectangle { background: #3a3314; height: 44px;
+                HorizontalLayout { padding: 8px; padding-left: 20px; padding-right: 16px; spacing: 10px;
+                    Label { text: I18n.tr("banner.reload"); horizontal-stretch: 1; color: #ffe9a8; }
+                    Button { text: I18n.tr("action.reload"); clicked => { root.reload(); } }
+                }
+            }
+            if root.error-summary != "" : Rectangle { background: #3b1c1a;
+                VerticalLayout { padding: 12px; padding-left: 20px; padding-right: 16px; spacing: 6px;
+                    HorizontalLayout { spacing: 10px;
+                        VerticalLayout { horizontal-stretch: 1; spacing: 2px;
+                            Label { text: root.error-summary; color: #ffd2cc; font-weight: 600; }
+                            if root.error-fix != "" : Muted { text: root.error-fix; color: #f0b8b0; }
+                        }
+                        if root.error-action == 1 : Button { text: I18n.tr("nav.models"); clicked => { root.error-action-clicked(1); } }
+                        if root.error-action == 2 : Button { text: I18n.tr("action.retry"); clicked => { root.error-action-clicked(2); } }
+                        if root.error-action == 3 : Button { text: I18n.tr("nav.audio"); clicked => { root.error-action-clicked(3); } }
+                        if root.error-action == 4 : Button { text: I18n.tr("action.retry"); clicked => { root.error-action-clicked(4); } }
+                        Button { text: root.show-details ? I18n.tr("action.hide_details") : I18n.tr("action.details"); clicked => { root.show-details = !root.show-details; } }
+                        Button { text: I18n.tr("action.dismiss"); clicked => { root.dismiss-error(); } }
+                    }
+                    if root.show-details : TextEdit { text: root.error-detail; read-only: true; height: 110px; font-size: 12px; }
+                }
+            }
+            // The subtitles page keeps its live preview in view while the controls below scroll.
+            if root.page == 1 : HorizontalLayout { alignment: LayoutAlignment.center; vertical-stretch: 0;
+                VerticalLayout { alignment: LayoutAlignment.start; padding: 24px; padding-top: 20px; padding-bottom: 8px; spacing: 12px; max-width: 880px; preferred-width: 880px; horizontal-stretch: 1;
+                    VerticalLayout { spacing: 4px;
+                        Text { text: I18n.tr("page.subtitles"); color: white; font-size: 20px; font-weight: 600; wrap: word-wrap; }
+                        Muted { text: I18n.tr("page.subtitles_desc"); font-size: 13px; }
+                    }
+                    Rectangle { height: clamp(preview-panel.preferred-height + 52px, 150px, 280px); border-radius: 8px; clip: true;
+                        background: #1a1b1d;
+                        accessible-role: image; accessible-label: I18n.tr("subs.live_preview");
+                        // Light, mid and dark backdrops: the outline must hold on all three.
+                        Rectangle { x: 0px; width: parent.width / 3; background: #dcd7ce; }
+                        Rectangle { x: parent.width / 3; width: parent.width / 3; background: #56684a; }
+                        Text { x: parent.width - self.width - 12px; y: 8px; text: I18n.tr("subs.live_preview"); color: #ffffff90; font-size: 11px; }
+                        preview-panel := SubtitlePanel { x: 20px; width: parent.width - 40px; height: self.preferred-height; y: max(8px, parent.height - self.height - 16px);
+                            source: root.demo-source; target: root.demo-target; source-face: root.font-names[root.source-font-index]; target-face: root.font-names[root.target-font-index];
+                            size: round(root.font-size); gap: round(root.line-gap); effect: root.effect; bg-opacity: root.bg-opacity / 100; show-source: root.show-mode != 1; show-target: root.show-mode != 2 && root.translate-enabled;
+                            translation-first: root.translation-first; source-tint: root.source-tint; target-tint: root.target-tint; panel-color: root.panel-color; source-scale: root.source-scale / 100;
+                            align: root.align; outline: round(root.outline); source-bold: root.source-bold; target-bold: root.target-bold; fit: root.fit-text; radius: round(root.radius) * 1px;
+                            edge-color: root.edge-color; text-alpha: root.text-opacity / 100; }
+                    }
+                }
+            }
+            ScrollView { vertical-stretch: 1;
+                HorizontalLayout { alignment: LayoutAlignment.center;
+                VerticalLayout { padding: 24px; padding-top: 20px; spacing: 14px; alignment: LayoutAlignment.start; max-width: 880px; preferred-width: 880px; horizontal-stretch: 1;
+                    if root.page != 1 : VerticalLayout { spacing: 4px; padding-bottom: 4px;
+                        Text { text: root.page == 0 ? I18n.tr("page.home") : root.page == 1 ? I18n.tr("page.subtitles") : root.page == 2 ? I18n.tr("page.audio") : root.page == 3 ? I18n.tr("page.models") : root.page == 4 ? I18n.tr("page.language") : root.page == 6 ? I18n.tr("page.transcript") : I18n.tr("page.advanced"); color: white; font-size: 20px; font-weight: 600; wrap: word-wrap; }
+                        Muted { text: root.page == 0 ? I18n.tr("page.home_desc") : root.page == 1 ? I18n.tr("page.subtitles_desc") : root.page == 2 ? I18n.tr("page.audio_desc") : root.page == 3 ? I18n.tr("page.models_desc") : root.page == 4 ? I18n.tr("page.language_desc") : root.page == 6 ? I18n.tr("page.transcript_desc") : I18n.tr("page.advanced_desc"); font-size: 13px; }
+                    }
+                    // ---------- Home ----------
+                    if root.page == 0 : VerticalLayout { spacing: 14px;
+                        Card { title: I18n.tr("setup.title");
+                            Muted { text: I18n.tr("setup.intro"); }
+                            StepRow { number: 1; done: root.runtime-ok; title: I18n.tr("setup.runtime"); detail: root.runtime-detail;
+                                if !root.runtime-ok : Button { text: root.runtime-action; enabled: !root.download-busy; clicked => { root.install-runtimes(); } }
+                            }
+                            StepRow { number: 2; done: root.asr-ok; title: I18n.tr("setup.asr"); detail: root.asr-detail;
+                                Button { text: I18n.tr("action.choose_file"); clicked => { root.choose-model(0); } }
+                                if !root.asr-ok : AccentButton { text: root.rec-asr-action; enabled: !root.download-busy; clicked => { root.download-recommended(0); } }
+                            }
+                            StepRow { number: 3; done: root.translation-ok || !root.translate-enabled; title: I18n.tr("setup.translation"); detail: root.translate-enabled ? root.translation-detail : I18n.tr("setup.translation_off");
+                                if root.translate-enabled : Button { text: I18n.tr("action.choose_file"); clicked => { root.choose-model(1); } }
+                                if root.translate-enabled && !root.translation-ok : Button { text: root.rec-translation-action; enabled: !root.download-busy; clicked => { root.download-recommended(1); } }
+                                Toggle { text: I18n.tr("setup.translate_switch"); checked <=> root.translate-enabled; toggled => { root.commit(); } }
+                            }
+                            if root.download-busy : HorizontalLayout { spacing: 10px;
+                                Bar { progress: root.download-progress; horizontal-stretch: 1; }
+                                Label { text: root.download-text; }
+                                Button { text: I18n.tr("action.cancel"); clicked => { root.cancel-download(); } }
+                            }
+                            StepRow { number: 4; done: root.rms > 0.002; title: I18n.tr("setup.audio"); detail: I18n.tr("setup.audio_detail");
+                                ComboBox { model: root.audio-names; current-index <=> root.audio-index; width: 220px; selected => { root.commit(); } }
+                            }
+                            HorizontalLayout { padding-left: 38px; spacing: 10px;
+                                Bar { progress: min(1, root.rms * 14); horizontal-stretch: 1; accessible-label: I18n.tr("audio.level"); }
+                                Muted { text: root.voice ? I18n.tr("audio.voice") : root.running ? I18n.tr("audio.quiet") : I18n.tr("audio.level_hint"); width: 160px; }
+                            }
+                            StepRow { number: 5; done: root.overlay-visible; title: I18n.tr("setup.overlay"); detail: I18n.tr("setup.overlay_detail");
+                                Button { text: root.preview ? I18n.tr("overlay.end_preview") : I18n.tr("action.preview"); clicked => { root.preview = !root.preview; root.overlay-visible = true; root.commit(); } }
+                            }
+                        }
+                        Card { title: I18n.tr("home.overlay");
+                            HorizontalLayout { spacing: 16px;
+                                Toggle { text: I18n.tr("overlay.show"); checked <=> root.overlay-visible; toggled => { root.commit(); } }
+                                Toggle { text: I18n.tr("overlay.lock"); checked <=> root.overlay-locked; toggled => { root.commit(); } }
+                                Rectangle { horizontal-stretch: 1; }
+                                Button { text: I18n.tr("action.reset_position"); clicked => { root.reset-overlay(); } }
+                            }
+                            Field { label: I18n.tr("home.autostart"); hint: I18n.tr("home.autostart_hint");
+                                Toggle { checked <=> root.autostart; toggled => { root.commit(); } }
+                            }
+                            Muted { text: root.hotkey-text; }
+                        }
+                        Card { title: I18n.tr("home.latest");
+                            Label { text: root.transcript == "" ? I18n.tr("home.no_text") : root.transcript; color: root.transcript == "" ? #aab6c2 : #e9eef4; font-size: 14px; }
+                            HorizontalLayout { spacing: 10px;
+                                Muted { text: I18n.tr("home.transcript_note"); horizontal-stretch: 1; vertical-alignment: center; }
+                                Button { text: I18n.tr("action.save_transcript"); enabled: root.transcript != ""; clicked => { root.save-transcript(0); } }
+                            }
+                        }
+                    }
+                    // ---------- Subtitle window ----------
+                    if root.page == 1 : VerticalLayout { spacing: 14px;
+                        Card { title: I18n.tr("subs.look");
+                            Field { label: I18n.tr("subs.preset");
+                                Button { text: I18n.tr("subs.preset_clean"); clicked => { root.apply-preset(0); } }
+                                Button { text: I18n.tr("subs.preset_cinema"); clicked => { root.apply-preset(1); } }
+                                Button { text: I18n.tr("subs.preset_large"); clicked => { root.apply-preset(2); } }
+                                Button { text: I18n.tr("subs.reset_look"); clicked => { root.apply-preset(3); } }
+                            }
+                            Field { label: I18n.tr("subs.profile"); hint: I18n.tr("subs.profile_hint");
+                                Button { text: I18n.tr("subs.profile_import"); clicked => { root.import-profile(); } }
+                                Button { text: I18n.tr("subs.profile_export"); clicked => { root.export-profile(); } }
+                            }
+                            Field { label: I18n.tr("subs.show_mode");
+                                ComboBox { horizontal-stretch: 1; model: [I18n.tr("subs.mode_both"), I18n.tr("subs.mode_translation"), I18n.tr("subs.mode_source")]; current-index <=> root.show-mode; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.history_mode"); hint: I18n.tr("subs.history_mode_hint");
+                                ComboBox { horizontal-stretch: 1; model: [I18n.tr("subs.mode_target"), I18n.tr("subs.mode_source"), I18n.tr("subs.mode_both")]; current-index <=> root.history-mode; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.history"); hint: I18n.tr("subs.history_hint");
+                                ComboBox { horizontal-stretch: 1; model: [I18n.tr("subs.history_none"), I18n.tr("subs.history_one"), I18n.tr("subs.history_two"), I18n.tr("subs.history_three"), I18n.tr("subs.history_fill")]; current-index <=> root.history-lines; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.hold"); hint: I18n.tr("subs.hold_hint");
+                                ValueSlider { label: I18n.tr("subs.hold"); minimum: 0; maximum: 60; value <=> root.hold-s; display: root.hold-s < 0.5 ? I18n.tr("subs.hold_forever") : round(root.hold-s) + " s"; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.translation_first");
+                                Toggle { checked <=> root.translation-first; toggled => { root.commit(); } }
+                            }
+                        }
+                        Card { title: I18n.tr("subs.text");
+                            Field { label: I18n.tr("subs.source_font");
+                                ComboBox { horizontal-stretch: 1; model: root.font-names; current-index <=> root.source-font-index; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.target_font");
+                                ComboBox { horizontal-stretch: 1; model: root.font-names; current-index <=> root.target-font-index; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.size");
+                                ValueSlider { label: I18n.tr("subs.size"); minimum: 12; maximum: 72; value <=> root.font-size; display: round(root.font-size) + " px"; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.source_scale"); hint: I18n.tr("subs.source_scale_hint");
+                                ValueSlider { label: I18n.tr("subs.source_scale"); minimum: 40; maximum: 100; value <=> root.source-scale; display: round(root.source-scale) + " %"; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.gap");
+                                ValueSlider { label: I18n.tr("subs.gap"); minimum: 0; maximum: 48; value <=> root.line-gap; display: round(root.line-gap) + " px"; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.align");
+                                ComboBox { horizontal-stretch: 1; model: [I18n.tr("subs.align_left"), I18n.tr("subs.align_center"), I18n.tr("subs.align_right")]; current-index <=> root.align; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.bold");
+                                Toggle { text: I18n.tr("subs.bold_source"); checked <=> root.source-bold; toggled => { root.commit(); } }
+                                Toggle { text: I18n.tr("subs.bold_target"); checked <=> root.target-bold; toggled => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.source_color");
+                                ColorPicker { label: I18n.tr("subs.source_color"); value <=> root.source-color; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.target_color");
+                                ColorPicker { label: I18n.tr("subs.target_color"); value <=> root.target-color; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.text_opacity");
+                                ValueSlider { label: I18n.tr("subs.text_opacity"); minimum: 20; maximum: 100; value <=> root.text-opacity; display: round(root.text-opacity) + " %"; changed => { root.commit(); } }
+                            }
+                        }
+                        Card { title: I18n.tr("subs.background");
+                            Field { label: I18n.tr("subs.effect");
+                                ComboBox { horizontal-stretch: 1; model: [I18n.tr("subs.effect_none"), I18n.tr("subs.effect_outline"), I18n.tr("subs.effect_shadow"), I18n.tr("subs.effect_band")]; current-index <=> root.effect; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.outline");
+                                ValueSlider { label: I18n.tr("subs.outline"); minimum: 1; maximum: 4; value <=> root.outline; display: round(root.outline) + " / 4"; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.panel_color");
+                                ColorPicker { label: I18n.tr("subs.panel_color"); value <=> root.panel-color-text; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.outline_color");
+                                ColorPicker { label: I18n.tr("subs.outline_color"); value <=> root.outline-color; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.opacity"); hint: I18n.tr("subs.opacity_hint");
+                                ValueSlider { label: I18n.tr("subs.opacity"); minimum: 0; maximum: 100; value <=> root.bg-opacity; display: round(root.bg-opacity) + " %"; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.radius");
+                                ValueSlider { label: I18n.tr("subs.radius"); minimum: 0; maximum: 24; value <=> root.radius; display: round(root.radius) + " px"; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.fit"); hint: I18n.tr("subs.fit_hint");
+                                Toggle { checked <=> root.fit-text; toggled => { root.commit(); } }
+                            }
+                        }
+                        Card { title: I18n.tr("subs.window");
+                            Field { label: I18n.tr("overlay.show");
+                                Toggle { checked <=> root.overlay-visible; toggled => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("overlay.lock");
+                                Toggle { checked <=> root.overlay-locked; toggled => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("action.preview");
+                                Toggle { checked <=> root.preview; toggled => { root.overlay-visible = true; root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.click_through"); hint: I18n.tr("subs.click_through_hint");
+                                Toggle { checked <=> root.click-through; toggled => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.bar"); hint: I18n.tr("subs.bar_hint");
+                                ComboBox { horizontal-stretch: 1; model: [I18n.tr("subs.bar_always"), I18n.tr("subs.bar_hover"), I18n.tr("subs.bar_hidden")]; current-index <=> root.bar-mode; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.anchor");
+                                ComboBox { horizontal-stretch: 1; model: [I18n.tr("subs.anchor_bottom"), I18n.tr("subs.anchor_top")]; current-index: root.anchor-top ? 1 : 0; selected => { root.anchor-top = self.current-index == 1; root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.interim"); hint: I18n.tr("subs.interim_hint");
+                                Toggle { checked <=> root.interim; toggled => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("subs.show_status"); hint: I18n.tr("subs.show_status_hint");
+                                Toggle { checked <=> root.show-status; toggled => { root.commit(); } }
+                            }
+                            Muted { text: I18n.tr("overlay.scroll_hint"); }
+                            Muted { text: root.hotkey-text; }
+                            HorizontalLayout { alignment: LayoutAlignment.start; spacing: 8px;
+                                Button { text: I18n.tr("subs.snap_bottom"); clicked => { root.snap(1); } }
+                                Button { text: I18n.tr("subs.snap_top"); clicked => { root.snap(0); } }
+                                Button { text: I18n.tr("action.reset_position"); clicked => { root.reset-overlay(); } }
+                            }
+                        }
+                    }
+                    // ---------- Audio ----------
+                    if root.page == 2 : VerticalLayout { spacing: 14px;
+                        Card { title: I18n.tr("audio.source");
+                            HorizontalLayout { spacing: 8px;
+                                ComboBox { model: root.audio-names; current-index <=> root.audio-index; horizontal-stretch: 1; selected => { root.commit(); } }
+                                Button { text: I18n.tr("action.refresh"); clicked => { root.refresh-audio(); } }
+                            }
+                            Field { label: I18n.tr("audio.mix_mic"); hint: I18n.tr("audio.mix_mic_hint");
+                                Toggle { checked <=> root.mix-mic; toggled => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("audio.record"); hint: I18n.tr("audio.record_hint");
+                                Toggle { checked <=> root.record-audio; toggled => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("audio.app_only"); hint: I18n.tr("audio.app_only_hint");
+                                ComboBox { horizontal-stretch: 1; model: root.app-names; current-index <=> root.app-index; selected => { root.commit(); } }
+                            }
+                            HorizontalLayout { spacing: 10px;
+                                Bar { progress: min(1, root.rms * 14); horizontal-stretch: 1; accessible-label: I18n.tr("audio.level"); }
+                                Muted { text: root.voice ? I18n.tr("audio.voice") : root.running ? I18n.tr("audio.quiet") : I18n.tr("audio.level_hint"); width: 180px; }
+                            }
+                            Muted { text: I18n.tr("audio.source_hint"); }
+                        }
+                        Card { title: I18n.tr("audio.vad");
+                            Muted { text: I18n.tr("audio.vad_hint"); }
+                            Field { label: I18n.tr("audio.sensitivity"); hint: root.threshold-text;
+                                ValueSlider { label: I18n.tr("audio.sensitivity"); minimum: 1; maximum: 100; value <=> root.sensitivity; display: round(root.sensitivity); changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("audio.silence"); hint: I18n.tr("audio.silence_hint");
+                                ValueSlider { label: I18n.tr("audio.silence"); minimum: 100; maximum: 2000; step: 50; value <=> root.silence-ms; display: round(root.silence-ms) + " ms"; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("audio.min_speech"); hint: I18n.tr("audio.min_speech_hint");
+                                ValueSlider { label: I18n.tr("audio.min_speech"); minimum: 50; maximum: 1000; step: 10; value <=> root.min-speech-ms; display: round(root.min-speech-ms) + " ms"; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("audio.max_segment"); hint: I18n.tr("audio.max_segment_hint");
+                                ValueSlider { label: I18n.tr("audio.max_segment"); minimum: 2; maximum: 30; value <=> root.max-segment-s; display: round(root.max-segment-s) + " s"; changed => { root.commit(); } }
+                            }
+                        }
+                    }
+                    // ---------- Models ----------
+                    if root.page == 3 : VerticalLayout { spacing: 14px;
+                        Card { title: I18n.tr("models.recommend"); note: I18n.tr("note.reload");
+                            Muted { text: root.hardware-text; }
+                            Field { label: I18n.tr("models.preference");
+                                ComboBox { horizontal-stretch: 1; model: [I18n.tr("pref.balanced"), I18n.tr("pref.latency"), I18n.tr("pref.quality"), I18n.tr("pref.memory")]; current-index <=> root.preference; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("models.reserve"); hint: I18n.tr("models.reserve_hint");
+                                SpinBox { minimum: 0; maximum: 65536; step-size: 256; value <=> root.gpu-reserve-mb; edited => { root.commit(); } horizontal-stretch: 1; }
+                            }
+                            Muted { text: root.recommendation; color: #d7e0e8; }
+                            HorizontalLayout { alignment: LayoutAlignment.start; Button { text: I18n.tr("models.apply_recommendation"); clicked => { root.apply-recommendation(); } } }
+                        }
+                        Card { title: I18n.tr("models.runtime");
+                            Muted { text: root.runtime-detail; }
+                            Field { label: I18n.tr("models.runtime_variant");
+                                ComboBox { horizontal-stretch: 1; model: root.runtime-names; current-index <=> root.runtime-family; selected => { root.commit(); } }
+                            }
+                            HorizontalLayout { alignment: LayoutAlignment.start; spacing: 8px;
+                                Button { text: root.runtime-action; enabled: !root.download-busy && !root.running && !root.loading; clicked => { root.install-runtimes(); } }
+                            }
+                        }
+                        if root.download-busy : Card {
+                            HorizontalLayout { spacing: 10px;
+                                Bar { progress: root.download-progress; horizontal-stretch: 1; }
+                                Label { text: root.download-text; }
+                                Button { text: I18n.tr("action.cancel"); clicked => { root.cancel-download(); } }
+                            }
+                        }
+                        Card { title: I18n.tr("models.library");
+                            HorizontalLayout { spacing: 8px; alignment: LayoutAlignment.start;
+                                Button { text: I18n.tr("models.choose_asr"); clicked => { root.choose-model(0); } }
+                                Button { text: I18n.tr("models.choose_translation"); clicked => { root.choose-model(1); } }
+                            }
+                            Muted { text: I18n.tr("models.current_asr") + "  " + root.asr-path; }
+                            Muted { text: I18n.tr("models.current_translation") + "  " + root.translation-path; }
+                            for row[i] in root.models : Rectangle { background: row.state-kind >= 3 ? #e0a43a14 : #ffffff08; border-radius: 6px;
+                                HorizontalLayout { padding: 10px; spacing: 10px;
+                                    VerticalLayout { horizontal-stretch: 1; spacing: 3px;
+                                        HorizontalLayout { spacing: 8px;
+                                            Label { text: row.name; font-weight: 600; wrap: no-wrap; overflow: elide; horizontal-stretch: 1; }
+                                            if row.recommended : Rectangle { height: 20px; width: rt.preferred-width + 12px; border-radius: 10px; background: #ffd16633; rt := Text { text: I18n.tr("models.recommended"); color: #ffd166; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; } }
+                                            Rectangle { height: 20px; width: st.preferred-width + 12px; border-radius: 10px; background: row.state-kind == 5 ? #ff7a6b33 : row.state-kind >= 2 ? #5bbf7a33 : #ffffff1a;
+                                                st := Text { text: row.state; color: row.state-kind == 5 ? #ffb3a8 : row.state-kind >= 2 ? #9fd0a8 : #c9d3dc; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
+                                            }
+                                        }
+                                        Muted { text: row.purpose + "  ·  " + row.size + "  ·  " + row.license; }
+                                        if row.state-kind == 1 : Bar { progress: row.progress; }
+                                    }
+                                    if row.can-download : Button { text: I18n.tr("action.download"); enabled: !root.download-busy; clicked => { root.download-model(i); } }
+                                    if row.can-use : Button { text: I18n.tr("action.use"); clicked => { root.use-model(i); } }
+                                    if row.can-remove : Button { text: I18n.tr("action.remove"); enabled: !root.running && !root.loading; clicked => { root.remove-model(i); } }
+                                }
+                            }
+                            Muted { text: I18n.tr("models.license_note"); }
+                        }
+                    }
+                    // ---------- Recognition and translation ----------
+                    if root.page == 4 : VerticalLayout { spacing: 14px;
+                        Card { title: I18n.tr("lang.recognition"); note: I18n.tr("note.reload");
+                            Field { label: I18n.tr("lang.spoken");
+                                ComboBox { horizontal-stretch: 1; model: root.asr-lang-names; current-index <=> root.asr-lang-index; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("lang.device");
+                                ComboBox { horizontal-stretch: 1; model: root.asr-device-names; current-index <=> root.asr-device-index; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("lang.hints"); hint: I18n.tr("lang.hints_hint");
+                                LineEdit { horizontal-stretch: 1; text <=> root.asr-prompt; edited => { root.commit(); } }
+                            }
+                            Muted { text: I18n.tr("lang.no_partial"); }
+                        }
+                        Card { title: I18n.tr("lang.translation"); note: I18n.tr("note.reload");
+                            Toggle { text: I18n.tr("setup.translate_switch"); checked <=> root.translate-enabled; toggled => { root.commit(); } }
+                            Field { label: I18n.tr("lang.from");
+                                ComboBox { horizontal-stretch: 1; enabled: root.translate-enabled; model: root.translation-lang-names; current-index <=> root.source-lang-index; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("lang.to");
+                                ComboBox { horizontal-stretch: 1; enabled: root.translate-enabled; model: root.translation-lang-names; current-index <=> root.target-lang-index; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("lang.format"); hint: I18n.tr("lang.format_hint");
+                                ComboBox { horizontal-stretch: 1; enabled: root.translate-enabled; model: ["PLaMo 3", "Hy-MT2", "OpenAI chat"]; current-index <=> root.translation-family; selected => { root.commit(); } }
+                            }
+                            Label { text: I18n.tr("lang.context"); }
+                            Muted { text: I18n.tr("lang.context_hint"); }
+                            TextEdit { text <=> root.translation-context; height: 80px; edited => { root.commit(); } }
+                            Label { text: I18n.tr("lang.glossary"); }
+                            Muted { text: I18n.tr("lang.glossary_hint"); }
+                            TextEdit { text <=> root.glossary; height: 80px; edited => { root.commit(); } }
+                        }
+                        Card { title: I18n.tr("lang.test");
+                            Muted { text: I18n.tr("lang.test_hint"); }
+                            HorizontalLayout { spacing: 8px;
+                                LineEdit { text <=> root.test-text; horizontal-stretch: 1; }
+                                Button { text: I18n.tr("action.test_translation"); enabled: !root.running && !root.loading && root.translate-enabled; clicked => { root.test-translation(); } }
+                            }
+                            if root.test-result != "" : Label { text: root.test-result; color: #fff3cf; }
+                        }
+                    }
+                    // ---------- Transcript ----------
+                    if root.page == 6 : VerticalLayout { spacing: 14px;
+                        VerticalLayout { spacing: 8px;
+                            HorizontalLayout { spacing: 10px;
+                                LineEdit { horizontal-stretch: 1; placeholder-text: I18n.tr("log.search"); text <=> root.log-query; accessible-label: I18n.tr("log.search"); }
+                                Toggle { text: I18n.tr("log.follow"); checked <=> root.log-follow; }
+                            }
+                            HorizontalLayout { spacing: 10px;
+                                Muted { text: root.log-count; vertical-alignment: center; }
+                                Muted { text: root.log-limited; horizontal-stretch: 1; vertical-alignment: center; }
+                            }
+                            TextEdit { text: root.log-text; read-only: true; height: 380px; font-size: 14px; wrap: word-wrap; accessible-label: I18n.tr("page.transcript"); }
+                            Muted { text: I18n.tr("log.follow_hint"); }
+                            HorizontalLayout { alignment: LayoutAlignment.start; spacing: 8px;
+                                Button { text: I18n.tr("log.export_txt"); clicked => { root.save-transcript(0); } }
+                                Button { text: I18n.tr("log.export_srt"); clicked => { root.save-transcript(1); } }
+                                Button { text: I18n.tr("log.export_vtt"); clicked => { root.save-transcript(2); } }
+                                Button { text: I18n.tr("log.open_folder"); clicked => { root.open-transcripts(); } }
+                                Rectangle { horizontal-stretch: 1; }
+                                DangerButton { text: I18n.tr("log.clear"); clicked => { root.clear-transcript(); } }
+                            }
+                        }
+                        Card { title: I18n.tr("log.retention");
+                            Field { label: I18n.tr("log.keep"); hint: I18n.tr("log.keep_hint");
+                                ComboBox { horizontal-stretch: 1; model: root.keep-names; current-index <=> root.keep-index; selected => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("log.live_file"); hint: I18n.tr("log.live_file_hint");
+                                Toggle { checked <=> root.live-file; toggled => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("log.save_files"); hint: I18n.tr("log.save_files_hint");
+                                Toggle { checked <=> root.save-files; toggled => { root.commit(); } }
+                            }
+                        }
+                    }
+                    // ---------- Advanced and diagnostics ----------
+                    if root.page == 5 : VerticalLayout { spacing: 14px;
+                        Card { title: I18n.tr("adv.performance");
+                            Text { text: root.performance; color: Palette.foreground; font-size: 13px; wrap: word-wrap; }
+                            Muted { text: I18n.tr("adv.performance_note"); }
+                            HorizontalLayout { alignment: LayoutAlignment.start; spacing: 8px;
+                                Button { text: I18n.tr("action.test_wav"); enabled: !root.running && !root.loading; clicked => { root.test-asr(); } }
+                                Button { text: I18n.tr("action.open_folder"); clicked => { root.open-data-folder(); } }
+                            }
+                        }
+                        Card { title: I18n.tr("adv.translation_engine"); note: I18n.tr("note.reload");
+                            Field { label: I18n.tr("adv.load_mode"); hint: I18n.tr("adv.load_mode_hint");
+                                ComboBox { horizontal-stretch: 1; model: [I18n.tr("adv.load_mmap"), I18n.tr("adv.load_none")]; current-index: root.mmap ? 0 : 1; selected => { root.mmap = self.current-index == 0; root.commit(); } }
+                            }
+                            Field { label: I18n.tr("adv.gpu_layers"); hint: I18n.tr("adv.gpu_layers_hint");
+                                SpinBox { horizontal-stretch: 1; minimum: 0; maximum: 999; value <=> root.gpu-layers; edited => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("adv.context_size");
+                                SpinBox { horizontal-stretch: 1; minimum: 512; maximum: 32768; step-size: 512; value <=> root.context-size; edited => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("adv.max_tokens");
+                                SpinBox { horizontal-stretch: 1; minimum: 1; maximum: 2048; value <=> root.max-tokens; edited => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("adv.interim_translate"); hint: I18n.tr("adv.interim_translate_hint");
+                                Toggle { checked <=> root.interim-translate; toggled => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("adv.refine"); hint: I18n.tr("adv.refine_hint");
+                                Toggle { checked <=> root.refine; toggled => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("adv.history"); hint: I18n.tr("adv.history_hint");
+                                SpinBox { horizontal-stretch: 1; minimum: 0; maximum: 16; value <=> root.history-turns; edited => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("adv.debounce");
+                                SpinBox { horizontal-stretch: 1; minimum: 0; maximum: 1000; step-size: 10; value <=> root.debounce-ms; edited => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("adv.temperature");
+                                ValueSlider { label: I18n.tr("adv.temperature"); minimum: 0; maximum: 2; step: 0.1; value <=> root.temperature; display: round(root.temperature * 10) / 10; changed => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("adv.asr_threads");
+                                SpinBox { horizontal-stretch: 1; minimum: 1; maximum: 32; value <=> root.asr-threads; edited => { root.commit(); } }
+                            }
+                        }
+                        Card { title: I18n.tr("adv.external"); note: I18n.tr("note.reload");
+                            Toggle { text: I18n.tr("adv.local"); checked <=> root.local-translation; toggled => { root.commit(); } }
+                            Field { label: I18n.tr("adv.endpoint"); hint: I18n.tr("adv.endpoint_hint");
+                                LineEdit { horizontal-stretch: 1; enabled: !root.local-translation; text <=> root.endpoint; edited => { root.commit(); } }
+                            }
+                            Field { label: I18n.tr("adv.model_id");
+                                LineEdit { horizontal-stretch: 1; text <=> root.model-id; edited => { root.commit(); } }
+                            }
+                        }
+                        Card { title: I18n.tr("adv.runtimes"); note: I18n.tr("note.reload");
+                            Label { text: I18n.tr("adv.asr_runtime"); }
+                            HorizontalLayout { spacing: 8px; LineEdit { text <=> root.asr-runtime; horizontal-stretch: 1; edited => { root.commit(); } } Button { text: I18n.tr("action.browse"); clicked => { root.choose-runtime(0); } } }
+                            Label { text: I18n.tr("adv.translation_runtime"); }
+                            HorizontalLayout { spacing: 8px; LineEdit { text <=> root.translation-runtime; horizontal-stretch: 1; edited => { root.commit(); } } Button { text: I18n.tr("action.browse"); clicked => { root.choose-runtime(1); } } }
+                            Muted { text: I18n.tr("adv.runtime_note"); }
+                        }
+                        Card { title: I18n.tr("adv.model_info");
+                            TextEdit { text: root.model-info == "" ? I18n.tr("adv.model_info_empty") : root.model-info; read-only: true; height: 90px; font-size: 12px; }
+                        }
+                    }
+                }
+                }
+            }
+        }
+    }
+}
